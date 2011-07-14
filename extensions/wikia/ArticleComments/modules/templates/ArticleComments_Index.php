@@ -70,7 +70,7 @@
 		echo '<div class="article-comments-pagination upper-pagination"><div>' . $pagination . '</div></div>';
 	}
 
-	echo wfRenderPartial('ArticleComments', 'CommentList', array('commentListRaw' => $commentListRaw, 'useMaster' => false));
+	echo wfRenderPartial('ArticleComments', 'CommentList', array('commentListRaw' => $commentListRaw, 'page' => $page, 'useMaster' => false));
 
 	?>
 
