@@ -1,5 +1,5 @@
 <?php
-class ArticleCommentsModule extends WikiaController {
+class ArticleCommentsController extends WikiaController {
 	private $dataLoaded = false;
 
 	public function executeIndex() {
