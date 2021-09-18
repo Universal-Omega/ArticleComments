@@ -20,7 +20,6 @@ jobs:
         git config --global user.email "github-actions@users.noreply.github.com"
         git clone https://github.com/Wikia/app.git --depth=1
         cd app
-#       git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
         wget https://raw.githubusercontent.com/newren/git-filter-repo/main/git-filter-repo
         python3 git-filter-repo --force --path extensions/wikia/ArticleComments/ --source https://github.com/Wikia/app --target https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git
         mv extensions/wikia/ArticleComments/* ./
