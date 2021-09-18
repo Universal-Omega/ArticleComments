@@ -21,7 +21,7 @@ jobs:
         git clone https://github.com/Wikia/app.git --depth=1
         cd app
         wget https://raw.githubusercontent.com/newren/git-filter-repo/main/git-filter-repo
-        python3 git-filter-repo --force --path extensions/wikia/ArticleComments/ --source https://github.com/Wikia/app --target "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+        python3 git-filter-repo --force --path extensions/wikia/ArticleComments/ --source https://github.com/Wikia/app
         mv extensions/wikia/ArticleComments/* ./
         rm -rf extensions
         rm git-filter-repo
