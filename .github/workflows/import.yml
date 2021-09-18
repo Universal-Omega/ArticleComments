@@ -21,7 +21,7 @@ jobs:
         git clone https://github.com/Wikia/app --depth=1
         cd app
         wget https://raw.githubusercontent.com/newren/git-filter-repo/main/git-filter-repo
-        python3 git-filter-repo --path extensions/wikia/ArticleComments/
+        python3 git-filter-repo --force --path extensions/wikia/ArticleComments/
         git remote -v
         git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
         git remote -v
