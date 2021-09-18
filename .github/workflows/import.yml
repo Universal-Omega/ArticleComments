@@ -26,6 +26,6 @@ jobs:
         git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
         git remote -v
         git commit -m "Import from https://github.com/Wikia/app/tree/dev/extensions/wikia/ArticleComments" || echo "No changes to commit"
-        mv extensions/Wikia/ArticleComments/* ./
+        mv extensions/wikia/ArticleComments/* ./
         ls
 #       git push -u origin Universal-Omega-patch-1
