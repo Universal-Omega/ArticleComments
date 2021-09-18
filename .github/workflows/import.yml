@@ -1,0 +1,28 @@
+name: Import
+
+on:
+  create:
+  push:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  test:
+    name: Import
+    runs-on: ubuntu-latest
+    steps:
+    - name: Push the changes
+      if: github.event_name == 'push'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        git config --global user.name "github-actions"
+        git config --global user.email "github-actions@users.noreply.github.com"
+        git clone https://github.com/Wikia/app
+        cd app
+        git filter-repo --path extensions/wikia/ArticleComments/
+        git remote -v
+        git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+        git remote -v
+        git commit -am "Import from https://github.com/Wikia/app/tree/dev/extensions/wikia/ArticleComments" || echo "No changes to commit"
+#       git push -u origin Universal-Omega-patch-1
