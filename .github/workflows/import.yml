@@ -18,9 +18,10 @@ jobs:
       run: |
         git config --global user.name "github-actions"
         git config --global user.email "github-actions@users.noreply.github.com"
-        git clone https://github.com/Wikia/app
+        git clone https://github.com/Wikia/app --depth=1
         cd app
-        python3 git-filter-repo.py --path extensions/wikia/ArticleComments/
+        wget https://raw.githubusercontent.com/newren/git-filter-repo/main/git-filter-repo
+        python3 git-filter-repo --path extensions/wikia/ArticleComments/
         git remote -v
         git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
         git remote -v
