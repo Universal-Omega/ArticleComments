@@ -25,8 +25,8 @@ jobs:
         mv extensions/wikia/ArticleComments/* ./
         rm -rf extensions
         rm git-filter-repo
-        git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
         git add .
+        git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
         git commit -m "Import from https://github.com/Wikia/app/tree/dev/extensions/wikia/ArticleComments" || echo "No changes to commit"
         git pull origin master --rebase
         git push -u origin master
