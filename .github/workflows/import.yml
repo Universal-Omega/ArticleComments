@@ -23,8 +23,8 @@ jobs:
         wget https://raw.githubusercontent.com/newren/git-filter-repo/main/git-filter-repo
         python3 git-filter-repo --force --path extensions/wikia/ArticleComments/ --source extensions/wikia/ArticleComments/ --target ./
         rm git-filter-repo
-        git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
         git add .
+        git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
         git commit -m "Import from https://github.com/Wikia/app/tree/dev/extensions/wikia/ArticleComments" || echo "No changes to commit"
         git pull origin dev --rebase
         git push -u origin dev
