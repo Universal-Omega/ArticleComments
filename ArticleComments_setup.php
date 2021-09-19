@@ -43,52 +43,50 @@ $wgAutoloadClasses['ArticleCommentsHooks'] = __DIR__ . '/ArticleCommentsHooks.cl
 
 $wgExtensionMessagesFiles['ArticleComments'] = __DIR__ . '/ArticleComments.i18n.php';
 
-if (!empty($wgEnableWallEngine) || !empty($wgEnableArticleCommentsExt) || !empty($wgEnableBlogArticles)) {
+$wgHooks['ArticleDelete'][] = 'ArticleCommentList::articleDelete';
+$wgHooks['ArticleDeleteComplete'][] = 'ArticleCommentList::articleDeleteComplete';
+$wgHooks['ArticleRevisionUndeleted'][] = 'ArticleCommentList::undeleteComments';
+$wgHooks['RecentChange_save'][] = 'ArticleComment::watchlistNotify';
+// recentchanges
+$wgHooks['ChangesListMakeSecureName'][] = 'ArticleCommentList::makeChangesListKey';
+$wgHooks['ChangesListInsertArticleLink'][] = 'ArticleCommentList::ChangesListInsertArticleLink';
+// $wgHooks['WikiaRecentChangesBlockHandlerChangeHeaderBlockGroup'][] = 'ArticleCommentList::setHeaderBlockGroup';
+// special::watchlist
+$wgHooks['ComposeCommonSubjectMail'][] = 'ArticleComment::ComposeCommonMail';
+$wgHooks['ComposeCommonBodyMail'][] = 'ArticleComment::ComposeCommonMail';
+// TOC
+$wgHooks['Parser::InjectTOCitem'][] = 'ArticleCommentInit::InjectTOCitem';
+// omit captcha
+$wgHooks['ConfirmEdit::onConfirmEdit'][] = 'ArticleCommentList::onConfirmEdit';
+// redirect
+$wgHooks['ArticleFromTitle'][] = 'ArticleCommentList::ArticleFromTitle';
+// user talk comment and notify
+$wgHooks['UserMailer::NotifyUser'][] = 'ArticleCommentInit::ArticleCommentNotifyUser';
+// blogs
+$wgHooks['UndeleteComplete'][] = 'ArticleCommentList::undeleteComplete';
+// prevent editing not own comments
+$wgHooks['userCan'][] = 'ArticleComment::userCan';
+// HAWelcome
+$wgHooks['HAWelcomeGetPrefixText'][] = 'ArticleCommentInit::HAWelcomeGetPrefixText';
 
-	$wgHooks['ArticleDelete'][] = 'ArticleCommentList::articleDelete';
-	$wgHooks['ArticleDeleteComplete'][] = 'ArticleCommentList::articleDeleteComplete';
-	$wgHooks['ArticleRevisionUndeleted'][] = 'ArticleCommentList::undeleteComments';
-	$wgHooks['RecentChange_save'][] = 'ArticleComment::watchlistNotify';
-	// recentchanges
-	$wgHooks['ChangesListMakeSecureName'][] = 'ArticleCommentList::makeChangesListKey';
-	$wgHooks['ChangesListInsertArticleLink'][] = 'ArticleCommentList::ChangesListInsertArticleLink';
-	$wgHooks['WikiaRecentChangesBlockHandlerChangeHeaderBlockGroup'][] = 'ArticleCommentList::setHeaderBlockGroup';
-	// special::watchlist
-	$wgHooks['ComposeCommonSubjectMail'][] = 'ArticleComment::ComposeCommonMail';
-	$wgHooks['ComposeCommonBodyMail'][] = 'ArticleComment::ComposeCommonMail';
-	// TOC
-	$wgHooks['Parser::InjectTOCitem'][] = 'ArticleCommentInit::InjectTOCitem';
-	// omit captcha
-	$wgHooks['ConfirmEdit::onConfirmEdit'][] = 'ArticleCommentList::onConfirmEdit';
-	// redirect
-	$wgHooks['ArticleFromTitle'][] = 'ArticleCommentList::ArticleFromTitle';
-	// user talk comment and notify
-	$wgHooks['UserMailer::NotifyUser'][] = 'ArticleCommentInit::ArticleCommentNotifyUser';
-	// blogs
-	$wgHooks['UndeleteComplete'][] = 'ArticleCommentList::undeleteComplete';
-	// prevent editing not own comments
-	$wgHooks['userCan'][] = 'ArticleComment::userCan';
-	// HAWelcome
-	$wgHooks['HAWelcomeGetPrefixText'][] = 'ArticleCommentInit::HAWelcomeGetPrefixText';
+// added by Moli
+// special::movepage
+$wgHooks['SpecialMovepageAfterMove'][] = 'ArticleComment::moveComments';
 
-	// added by Moli
-	// special::movepage
-	$wgHooks['SpecialMovepageAfterMove'][] = 'ArticleComment::moveComments';
+$wgHooks['ParserFirstCallInit'][] = 'ArticleComment::metadataParserInit';
 
-	$wgHooks['ParserFirstCallInit'][] = 'ArticleComment::metadataParserInit';
+// $wgHooks['WikiaMobileAssetsPackages'][] = 'ArticleCommentInit::onWikiaMobileAssetsPackages';
 
-	$wgHooks['WikiaMobileAssetsPackages'][] = 'ArticleCommentInit::onWikiaMobileAssetsPackages';
+$wgHooks['BeforePageDisplay'][] = 'ArticleCommentsController::onBeforePageDisplay';
+$wgHooks['SkinAfterContent'][] = 'ArticleCommentsController::onSkinAfterContent';
 
-	$wgHooks['BeforePageDisplay'][] = 'ArticleCommentsController::onBeforePageDisplay';
-	$wgHooks['SkinAfterContent'][] = 'ArticleCommentsController::onSkinAfterContent';
+$wgHooks['FilePageImageUsageSingleLink'][] = 'ArticleCommentInit::onFilePageImageUsageSingleLink';
+$wgHooks['AfterPageHeaderButtons'][] = 'ArticleCommentsHooks::onAfterPageHeaderButtons';
 
-	$wgHooks['FilePageImageUsageSingleLink'][] = 'ArticleCommentInit::onFilePageImageUsageSingleLink';
-	$wgHooks['AfterPageHeaderButtons'][] = 'ArticleCommentsHooks::onAfterPageHeaderButtons';
+// SUS-3433 article comments mapping table
+$wgHooks['LoadExtensionSchemaUpdates'][] = 'ArticleCommentsHooks::onLoadExtensionSchemaUpdates';
 
-	// SUS-3433 article comments mapping table
-	$wgHooks['LoadExtensionSchemaUpdates'][] = 'ArticleCommentsHooks::onLoadExtensionSchemaUpdates';
-}
-
+/*
 //JSMEssages setup
 JSMessages::registerPackage( 'ArticleCommentsCounter', [
 	'oasis-comments-header',
@@ -103,6 +101,7 @@ JSMessages::registerPackage( 'WikiaMobileComments', [
 	'wikiamobile-article-comments-login-post',
 	'wikiamobile-article-comments-post-fail'
 ] );
+*/
 
 // Ajax dispatcher
 $wgAjaxExportList[] = 'ArticleCommentsAjax';
@@ -119,8 +118,7 @@ function ArticleCommentsAjax() {
 			$json = json_encode( $data );
 			$response = new AjaxResponse( $json );
 			$response->setContentType( 'application/json; charset=utf-8' );
-		}
-		else {
+		} else {
 			// send text as text/html
 			$response = new AjaxResponse( $data );
 			$response->setContentType( 'text/html; charset=utf-8' );
