@@ -21,86 +21,8 @@
 	"AutoloadClasses": {
 		"ArticleCommentInit": "classes/ArticleCommentInit.class.php"
 	},
-	"GroupPermissions": {
-		"user": {
-			"createblogpost": true
-		}
-	},
-	"AvailableRights": [
-		"createblogpost"
-	],
-	"namespaces": [
-		{
-			"id": 502,
-			"constant": "NS_USER_BLOG",
-			"name": "User_blog",
-			"protection": "edit",
-			"subpages": true
-		},
-		{
-			"id": 503,
-			"constant": "NS_USER_BLOG_TALK",
-			"name": "User_blog_talk",
-			"subpages": true
-		}
-	],
-	"SpecialPages": {
-		"ArticlesHome": "ArticlesHome",
-		"CreateBlogPost": "SpecialCreateBlogPost"
-	},
-	"ResourceModules": {
-		"ext.simpleBlogPage": {
-			"styles": [
-				"resources/css/ext.simpleblogpage.simpleblogpage.css",
-				"resources/css/ext.simpleblogpage.hideContentsub.css"
-			]
-		},
-		"ext.simpleBlogPage.articlesHome": {
-			"styles": [
-				"resources/css/ext.simpleblogpage.articleshome.css",
-				"resources/css/ext.simpleblogpage.hideContentsub.css"
-			]
-		},
-		"ext.simpleBlogPage.create.css": {
-			"styles": [
-				"resources/css/ext.simpleblogpage.createblogpost.css"
-			]
-		},
-		"ext.simpleBlogPage.create.js": {
-			"scripts": [
-				"resources/js/ext.simpleblogpage.createblogpost.js",
-				"resources/js/AddMoreButton.js"
-			],
-			"dependencies": [
-				"mediawiki.api"
-			]
-		}
-	},
-	"ResourceFileModulePaths": {
-		"localBasePath": "",
-		"remoteExtPath": "SimpleBlogPage"
-	},
-	"config": {
-		"SimpleBlogPageDisplay": {
-			"value": {
-				"leftcolumn": true,
-				"rightcolumn": true,
-				"author": true,
-				"author_articles": true,
-				"recent_editors": true,
-				"recent_voters": true,
-				"popular_articles": true,
-				"in_the_news": true,
-				"comments_of_day": false,
-				"games": true,
-				"new_articles": true
-			}
-		}
-	},
 	"Hooks": {
-		"AlternateEdit": "SimpleBlogPageHooks::onAlternateEdit",
-		"ArticleFromTitle": "SimpleBlogPageHooks::onArticleFromTitle",
-		"CosmosRail": "SimpleBlogPageHooks::onCosmosRail"
+		"": ""
 	},
 	"manifest_version": 2
 }
