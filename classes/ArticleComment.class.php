@@ -399,8 +399,6 @@ class ArticleComment {
 	 * Parse the comment content in a lazy fashion: when either getText() or getHeadItems() is called
 	 */
 	private function parseText() {
-		wfProfileIn( __METHOD__ );
-
 		// SUS-1557: only load from DB if raw text was not set manually
 		if ( !is_string( $this->mRawtext ) ) {
 			$this->load();
@@ -444,8 +442,6 @@ class ArticleComment {
 		$this->mText = $data['text'];
 		$this->mHeadItems = $data['headitems'];
 		$this->mMetadata = $data['metadata'];
-
-		wfProfileOut( __METHOD__ );
 	}
 
 	/**
@@ -556,7 +552,7 @@ class ArticleComment {
 
 		$title = $this->getTitle();
 		$commentId = $title->getArticleId();
-		$canDelete = !count( $title->getUserPermissionsErrors( 'delete', F::app()->wg->User, false, [] ) );
+		$canDelete = !count( $title->getUserPermissionsErrors( 'delete', $wgUser, false, [] ) );
 
 		// vary cache on permission as well so it changes we can show it to a user
 		$articleDataKey = wfMemcKey(
@@ -845,7 +841,7 @@ class ArticleComment {
 			'articleFullUrl' => $this->mTitle->getFullUrl(),
 		];
 
-		return F::app()->getView( 'ArticleComments', 'Edit', $vars )->render();
+		return '' /* F::app()->getView( 'ArticleComments', 'Edit', $vars )->render() */;
 	}
 
 	/**
@@ -1125,13 +1121,12 @@ class ArticleComment {
 			case EditPage::AS_SUCCESS_UPDATE:
 			case EditPage::AS_SUCCESS_NEW_ARTICLE:
 				$comment = ArticleComment::newFromArticle( $article );
-				$app = F::app();
 
-				if ( $app->checkSkin( 'wikiamobile' ) ) {
-					$viewName = 'WikiaMobileComment';
-				} else {
+				// if ( $app->checkSkin( 'minervaneue' ) ) {
+					// $viewName = 'MobileComment';
+				// } else {
 					$viewName = 'Comment';
-				}
+				// }
 
 				$parameters = [
 					'comment' => $comment->getData( true ),
@@ -1153,7 +1148,7 @@ class ArticleComment {
 				$message = false;
 
 				// commit before purging
-				wfGetDB( DB_MASTER )->commit();
+				wfGetDB( DB_PRIMARY )->commit();
 
 				ArticleCommentList::purgeCache( $parentPageTitle );
 
@@ -1550,9 +1545,10 @@ class ArticleComment {
 	 *
 	 * @return boolean
 	 */
-	static public function isLoadingOnDemand() {
-		$app = F::app();
-		return $app->wg->ArticleCommentsLoadOnDemand && !$app->checkSkin( 'wikiamobile' );
+	public static function isLoadingOnDemand() {
+		global $wgArticleCommentsLoadOnDemand;
+
+		return $wgArticleCommentsLoadOnDemand /* && !$app->checkSkin( 'minervaneue' ) */;
 	}
 
 	/**
@@ -1625,8 +1621,8 @@ class ArticleComment {
 	 * @return bool Whether to continue checking hooks
 	 */
 	static public function userCan( Title $title, User $user, string $action, &$result ): bool {
-		$wg = F::app()->wg;
-		$commentsNS = $wg->ArticleCommentsNamespaces;
+		global $wgArticleCommentsNamespaces, $wgEnableBlogArticles;
+		$commentsNS = $wgArticleCommentsNamespaces;
 		$ns = $title->getNamespace();
 
 		// Only handle article and blog comments
@@ -1635,10 +1631,8 @@ class ArticleComment {
 			return true;
 		}
 
-		wfProfileIn( __METHOD__ );
-
 		$comment = ArticleComment::newFromTitle( $title );
-		$isBlog = ( $wg->EnableBlogArticles && ArticleComment::isBlog( $title ) );
+		$isBlog = ( $wgEnableBlogArticles && ArticleComment::isBlog( $title ) );
 
 		switch ( $action ) {
 			// Creating article comments requires 'commentcreate' permission
@@ -1675,7 +1669,6 @@ class ArticleComment {
 				$result = $return = true;
 		}
 
-		wfProfileOut( __METHOD__ );
 		return $return;
 	}
 
@@ -1689,16 +1682,17 @@ class ArticleComment {
 	 * @return bool Whether $user can add a comment to $title
 	 */
 	static public function userCanCommentOn( Title $title, User $user = null ) {
-		$wg = F::app()->wg;
+		global $wgUser, $wgEnableBlogArticles;
+
 		if ( !( $user instanceof User ) ) {
-			$user = $wg->User;
+			$user = $wgUser;
 		}
 
 		if ( wfReadOnly() ) {
 			return false;
 		}
 
-		$isBlog = ( $wg->EnableBlogArticles && ArticleComment::isBlog( $title ) );
+		$isBlog = ( $wgEnableBlogArticles && ArticleComment::isBlog( $title ) );
 		if ( $isBlog ) {
 			$props = BlogArticle::getProps( $title->getArticleID() );
 			$commentingEnabled = isset( $props[ 'commenting' ] ) ? (bool) $props[ 'commenting' ] : true;
