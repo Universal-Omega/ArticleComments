@@ -3,7 +3,7 @@
  * ArticleComment is article, this class is used for manipulation on
  */
 
-use Wikia\Logger\WikiaLogger;
+use MediaWiki\Logger\LoggerFactory;
 
 class ArticleComment {
 
@@ -241,32 +241,34 @@ class ArticleComment {
 			return true;
 		}
 
+		$logger = LoggerFactory::getInstance( 'ArticleComments' );
+
 		// Get revision IDs
 		if ( !$this->loadFirstRevId( $master ) || !$this->loadLastRevId( $master ) ) {
-			WikiaLogger::instance()->error( 'Unable to load revision IDs', [
-				'issue' => 'SOC-1540',
+			$logger->error( 'Unable to load revision IDs', [
 				'firstRevId' => $this->mFirstRevId,
 				'lastRevId' => $this->mLastRevId,
 				'title' => print_r( $this->mTitle, true ),
 			] );
+
 			return false;
 		}
 
 		// Get revision objects
 		if ( !$this->loadFirstRevision() || !$this->loadLastRevision() ) {
-			WikiaLogger::instance()->error( 'Unable to load revision objects', [
-				'issue' => 'SOC-1540',
+			$logger->error( 'Unable to load revision objects', [
 				'firstRevId' => $this->mFirstRevId,
 				'lastRevId' => $this->mLastRevId,
 				'title' => print_r( $this->mTitle, true ),
 			] );
+
 			return false;
 		}
 
 		// get user that created this comment
 		$authorId = $this->mFirstRevision->getUser();
 
-		// SUS-3363: Use user name lookup or IP address
+		// Use user name lookup or IP address
 		if ( $authorId ) {
 			$this->mUser = User::newFromId( $authorId );
 		} else {
@@ -948,12 +950,12 @@ class ArticleComment {
 
 		$status = $editPage->internalAttemptSave( $result, $bot );
 
-		// SUS-1188
 		if ( !$status->isOK() ) {
-			WikiaLogger::instance()->error( __METHOD__ . ' - failed SUS-1188', [
-				'hook_error' => (string) $editPage->hookError,
+			$logger = LoggerFactory::getInstance( 'ArticleComments' );
+			$logger->error( __METHOD__ . ' - failed', [
+				'hook_error' => (string)$editPage->hookError,
 				'edit_status' => $status,
-				'edit_result' => (array) $result,
+				'edit_result' => (array)$result,
 				'exception' => new Exception( 'EditPage::internalAttemptSave failed', $status->value ),
 				'is_bot_bool' => $bot,
 				'title' => $editPage->getTitle()->getPrefixedDBkey(),
@@ -1017,10 +1019,14 @@ class ArticleComment {
 
 				// if $parentTitle is empty the logging below will be executed
 			}
-			// FB#2875 (log data for further debugging)
+
+			$logger = LoggerFactory::getInstance( 'ArticleComments' );
+
+			// log data for further debugging
 			if ( is_null( $parentArticle ) ) {
-				$debugTitle = empty( $title ) ? '--EMPTY--' : $title->getText(); // BugId:2646
-				WikiaLogger::instance()->error( 'Failed to create Article object', [
+				$debugTitle = empty( $title ) ? '--EMPTY--' : $title->getText();
+
+				$logger->error( 'Failed to create Article object', [
 					'method' => __METHOD__,
 					'parentId' => $parentId,
 					'title' => $debugTitle,
@@ -1038,7 +1044,7 @@ class ArticleComment {
 
 		if ( !( $commentTitle instanceof Title ) ) {
 			if ( !empty( $parentId ) ) {
-				WikiaLogger::instance()->error( 'Failed to create commentTitle', [
+				$logger->error( 'Failed to create commentTitle', [
 					'method' => __METHOD__,
 					'parentId' => $parentId,
 					'commentTitleText' => $commentTitleText
@@ -1159,7 +1165,8 @@ class ArticleComment {
 
 				$message = wfMessage( 'article-comments-error' )->escaped();
 
-				WikiaLogger::instance()->error( __METHOD__ . ' - PLATFORM-1311', [
+				$logger = LoggerFactory::getInstance( 'ArticleComments' );
+				$logger->error( __METHOD__, [
 					'status' => $status->value,
 					'reason' => 'article-comments-error',
 					'name' => $article->getTitle()->getPrefixedDBkey(),
@@ -1311,7 +1318,8 @@ class ArticleComment {
 		$task->call( 'move', $taskParams );
 		$submit_id = $task->queue();
 
-		WikiaLogger::instance()->debug( 'Added move task', [
+		$logger = LoggerFactory::getInstance( 'ArticleComments' );
+		$logger->debug( 'Added move task', [
 			'method' => __METHOD__,
 			'taskId' => $submit_id,
 			'page' => $taskParams['page'],
@@ -1374,6 +1382,8 @@ class ArticleComment {
 			return true;
 		}
 
+		$logger = LoggerFactory::getInstance( 'ArticleComments' );
+
 		$commentList = ArticleCommentList::newFromTitle( $oOldTitle );
 		$comments = $commentList->getCommentPages( true, false );
 
@@ -1394,7 +1404,7 @@ class ArticleComment {
 				# move comment level #1
 				$error = self::moveComment( $oCommentTitle, $oNewTitle, $form->reason );
 				if ( $error !== true ) {
-					WikiaLogger::instance()->error( 'Cannot move level 1 blog comments', [
+					$logger->error( 'Cannot move level 1 blog comments', [
 						'method' => __METHOD__,
 						'oldCommentTitle' => $oCommentTitle->getPrefixedText(),
 						'newCommentTitle' => $oNewTitle->getPrefixedText(),
@@ -1415,7 +1425,7 @@ class ArticleComment {
 						# move comment level #2
 						$error = self::moveComment( $oCommentTitle, $oNewTitle, $form->reason );
 						if ( $error !== true ) {
-							WikiaLogger::instance()->error( 'Cannot move level 2 blog comments', [
+							$logger->error( 'Cannot move level 2 blog comments', [
 								'method' => __METHOD__,
 								'oldCommentTitle' => $oCommentTitle->getPrefixedText(),
 								'newCommentTitle' => $oNewTitle->getPrefixedText(),
@@ -1461,7 +1471,7 @@ class ArticleComment {
 			$listing = ArticleCommentList::newFromTitle( $oNewTitle );
 			$listing->purge();
 		} else {
-			WikiaLogger::instance()->error( 'Cannot move article comments; no comments found', [
+			$logger->error( 'Cannot move article comments; no comments found', [
 				'method' => __METHOD__,
 				'oldTitle' => $oOldTitle->getPrefixedText(),
 			] );
