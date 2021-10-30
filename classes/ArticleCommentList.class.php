@@ -185,7 +185,7 @@ class ArticleCommentList {
 	 * @return array
 	 */
 	public function getCommentList( $master = true ) {
-		global $wgMemc;
+		$memc = ObjectCache::getLocalClusterInstance();
 
 		$request = RequestContext::getMain()->getRequest();
 
@@ -197,7 +197,7 @@ class ArticleCommentList {
 		 * skip cache if purging or using master connection or in case of single comment
 		 */
 		if ( $action != 'purge' && !$master && empty( $this->mCommentId ) ) {
-			$this->mCommentsAll = $wgMemc->get( $memckey );
+			$this->mCommentsAll = $memc->get( $memckey );
 		}
 
 		if ( empty( $this->mCommentsAll ) ) {
@@ -246,7 +246,7 @@ class ArticleCommentList {
 			$this->mCommentsAll = $pages;
 
 			if ( empty( $this->mCommentId ) ) {
-				$wgMemc->set( $memckey, $this->mCommentsAll, 3600 );
+				$memc->set( $memckey, $this->mCommentsAll, 3600 );
 			}
 		}
 
@@ -455,22 +455,26 @@ class ArticleCommentList {
 	 * @return String HTML text
 	 */
 	public function blockedPage() {
-		/** @var Language $wgLang */
-		global $wgUser, $wgLang, $wgContLang, $wgRequest;
+		$contLang = MediaWikiServices::getInstance()->getContentLanguage();
 
-		// macbre: prevent fatals in code below
-		if ( empty( $wgUser->mBlock ) ) {
+		$requestContext = RequestContext::getMain();
+		$lang = $requestContext->getLanguage();
+		$user = $requestContext->getUser();
+		$request = $requestContext->getRequest();
+
+		// prevent fatals in code below
+		if ( empty( $user->mBlock ) ) {
 			return '';
 		}
 
-		$block = $wgUser->mBlock;
+		$block = $user->mBlock;
 
 		list( $blockerName, $reason, $ip, $blockid, $blockTimestamp, $blockExpiry, $intended ) = [
-			$wgUser->blockedBy(),
-			$wgUser->blockedFor() ? $wgUser->blockedFor() : wfMessage( 'blockednoreason' )->text(),
-			$wgRequest->getIP(),
-			$wgUser->getBlockId(),
-			$wgLang->timeanddate( wfTimestamp( TS_MW, $block->mTimestamp ), true ),
+			$user->blockedBy(),
+			$user->blockedFor() ? $user->blockedFor() : wfMessage( 'blockednoreason' )->text(),
+			$request->getIP(),
+			$user->getBlockId(),
+			$lang->timeanddate( wfTimestamp( TS_MW, $block->mTimestamp ), true ),
 			$block->mExpiry,
 			$block->mAddress,
 		];
@@ -479,7 +483,7 @@ class ArticleCommentList {
 		if ( $block->shouldHideBlockerName() ) {
 			$blockerLink =  '[[Special:Contact|' . wfMessage( 'fandom-support' )->plain() . ']]';
 		} else {
-			$blockerLink = '[[' . $wgContLang->getNsText( NS_USER ) . ":{$blockerName}|{$blockerName}]]";
+			$blockerLink = '[[' . $contLang->getNsText( NS_USER ) . ":{$blockerName}|{$blockerName}]]";
 		}
 
 		if ( $blockExpiry == 'infinity' ) {
@@ -493,10 +497,10 @@ class ArticleCommentList {
 				}
 			}
 		} else {
-			$blockExpiry = $wgLang->timeanddate( wfTimestamp( TS_MW, $blockExpiry ), true );
+			$blockExpiry = $lang->timeanddate( wfTimestamp( TS_MW, $blockExpiry ), true );
 		}
 
-		if ( $wgUser->mBlock->mAuto ) {
+		if ( $user->mBlock->mAuto ) {
 			$msg = 'autoblockedtext';
 		} else {
 			$msg = 'blockedtext';
@@ -585,7 +589,9 @@ class ArticleCommentList {
 	 * @return string The cache key
 	 */
 	static private function getCacheKey( Title $title ) {
-		return wfMemcKey( 'articlecomment', 'comm', md5( $title->getDBkey() . $title->getNamespace() . self::CACHE_VERSION ) );
+		$memc = ObjectCache::getLocalClusterInstance();
+
+		return $memc->makeKey( 'articlecomment', 'comm', md5( $title->getDBkey() . $title->getNamespace() . self::CACHE_VERSION ) );
 	}
 
 	/**
@@ -594,9 +600,9 @@ class ArticleCommentList {
 	 * @param Title $title
 	 */
 	static public function purgeCache( Title $title ) {
-		global $wgMemc;
+		$memc = ObjectCache::getLocalClusterInstance();
 
-		$wgMemc->delete( self::getCacheKey( $title ) );
+		$memc->delete( self::getCacheKey( $title ) );
 		$title->invalidateCache();
 		$title->purgeSquid();
 
