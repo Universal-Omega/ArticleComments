@@ -1,4 +1,7 @@
 <?php
+
+use MediaWiki\MediaWikiServices;
+
 class ArticleCommentInit {
 	public static $enable = null;
 	public static $commentByAnonMsg = null;
@@ -147,7 +150,6 @@ class ArticleCommentInit {
 	 * @return boolean
 	 */
 	static public function HAWelcomeGetPrefixText( &$prefixedText, Title $title ) {
-
 		if ( ArticleComment::isTitleComment( $title ) ) {
 			$title = $title->getSubjectPage();
 			$prefixedText = $title->getPrefixedText();
@@ -206,11 +208,12 @@ class ArticleCommentInit {
 	}
 
 	public static function getUserNameFromRevision( Title $title ) {
-		$rev = Revision::newFromId( $title->getLatestRevID() );
+		$rev = MediaWikiServices::getInstance()->getRevisionLookup()
+			->getRevisionById( $title->getLatestRevID() );
 
 		$userName = null;
 		if ( !empty( $rev ) ) {
-			$user = User::newFromId( $rev->getUser() );
+			$user = User::newFromId( $rev->getUser()->getId() );
 
 			if ( !empty( $user ) ) {
 				$userName = $user->getName();
