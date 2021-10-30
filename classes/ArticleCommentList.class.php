@@ -1,5 +1,7 @@
 <?php
 
+use MediaWiki\MediaWikiServices;
+
 /**
  * ArticleCommentList is a listing, basically it's an array of comments
  */
@@ -201,7 +203,7 @@ class ArticleCommentList {
 		if ( empty( $this->mCommentsAll ) ) {
 			$pages = [ ];
 			$subpages = [ ];
-			$dbr = wfGetDB( $master ? DB_MASTER : DB_SLAVE );
+			$dbr = wfGetDB( $master ? DB_PRIMARY : DB_REPLICA );
 
 			$table = [ 'page' ];
 			$vars = [ 'page_id', 'page_title' ];
@@ -269,7 +271,7 @@ class ArticleCommentList {
 	 * @return array
 	 */
 	public function getAllCommentPages() {
-		$dbr = wfGetDB( DB_MASTER );
+		$dbr = wfGetDB( DB_PRIMARY );
 
 		$res = $dbr->select(
 			[ 'page' ],
@@ -289,10 +291,12 @@ class ArticleCommentList {
 
 	public function getQueryWhere( DatabaseBase $dbr ) {
 		$like = "page_title" . $dbr->buildLike( sprintf( "%s/%s", $this->mText, ARTICLECOMMENT_PREFIX ), $dbr->anyString() );
-		$namspace = MWNamespace::getTalk( $this->getTitle()->getNamespace() );
+
+		$namespaceInfo = MediaWikiServices::getInstance()->getNamespaceInfo();
+		$namespace = $namespaceInfo->getTalk( $this->getTitle()->getNamespace() );
 
 		if ( empty( $this->mCommentId ) ) {
-			return [ $like, 'page_namespace' => $namspace ];
+			return [ $like, 'page_namespace' => $namespace ];
 		}
 
 		$ac = ArticleComment::newFromId( $this->mCommentId );
@@ -302,19 +306,21 @@ class ArticleCommentList {
 			$parent = $title->getDBkey();
 		}
 		$like = "page_title" . $dbr->buildLike( $parent, $dbr->anyString() );
-		return [ $like, 'page_namespace' => $namspace ];
+		return [ $like, 'page_namespace' => $namespace ];
 	}
 
 	private function getRemovedCommentPages( $oTitle ) {
-		$pages = [ ];
+		$pages = [];
+
+		$namespaceInfo = MediaWikiServices::getInstance()->getNamespaceInfo();
 
 		if ( $oTitle instanceof Title ) {
-			$dbr = wfGetDB( DB_SLAVE );
+			$dbr = wfGetDB( DB_REPLICA );
 			$res = $dbr->select(
 				[ 'archive' ],
 				[ 'ar_page_id', 'ar_title' ],
 				[
-					'ar_namespace' => MWNamespace::getTalk( $this->getTitle()->getNamespace() ),
+					'ar_namespace' => $namespaceInfo->getTalk( $this->getTitle()->getNamespace() ),
 					"ar_title" . $dbr->buildLike( sprintf( "%s/%s", $oTitle->getDBkey(), ARTICLECOMMENT_PREFIX ), $dbr->anyString() )
 				],
 				__METHOD__,
@@ -323,7 +329,7 @@ class ArticleCommentList {
 			while ( $row = $dbr->fetchObject( $res ) ) {
 				$pages[ $row->ar_page_id ] = [
 					'title' => $row->ar_title,
-					'nspace' => MWNamespace::getTalk( $this->getTitle()->getNamespace() )
+					'nspace' => $namespaceInfo->getTalk( $this->getTitle()->getNamespace() )
 				];
 			}
 			$dbr->freeResult( $res );
@@ -524,7 +530,7 @@ class ArticleCommentList {
 		}
 
 		if ( !empty( $articles ) ) {
-			$db = wfGetDB( DB_SLAVE );
+			$db = wfGetDB( DB_REPLICA );
 			$res = $db->select(
 				'revision',
 				[ 'rev_page', 'min(rev_id) AS min_rev_id' ],
@@ -538,14 +544,14 @@ class ArticleCommentList {
 			/** @var stdClass $row */
 			foreach ( $res as $row ) {
 				if ( isset( $articles[$row->rev_page] ) ) {
-					$articles[$row->rev_page]->setFirstRevId( $row->min_rev_id, DB_SLAVE );
+					$articles[$row->rev_page]->setFirstRevId( $row->min_rev_id, DB_REPLICA );
 					unset( $articles[$row->rev_page] );
 				}
 			}
 
 			/** @var ArticleComment $comment */
 			foreach ( $articles as $id => $comment ) {
-				$comment->setFirstRevId( false, DB_SLAVE );
+				$comment->setFirstRevId( false, DB_REPLICA );
 			}
 		}
 	}
@@ -614,7 +620,9 @@ class ArticleCommentList {
 		global $wgOut, $wgRC2UDPEnabled, $wgMaxCommentsToDelete, $wgCityId, $wgUser, $wgEnableMultiDeleteExt;
 		$title = $wikiPage->getTitle();
 
-		if ( !MWNamespace::isTalk( $title->getNamespace() ) || !ArticleComment::isTitleComment( $title ) ) {
+		$namespaceInfo = MediaWikiServices::getInstance()->getNamespaceInfo();
+
+		if ( !$namespaceInfo->isTalk( $title->getNamespace() ) || !ArticleComment::isTitleComment( $title ) ) {
 			if ( empty( self::$mArticlesToDelete ) ) {
 				return true;
 			}
@@ -632,7 +640,7 @@ class ArticleCommentList {
 
 		// redirect to article/blog after deleting a comment (or whole article/blog)
 		$parts = ArticleComment::explode( $title->getText() );
-		$parentTitle = Title::newFromText( $parts['title'], MWNamespace::getSubject( $title->getNamespace() ) );
+		$parentTitle = Title::newFromText( $parts['title'], $namespaceInfo->getSubject( $title->getNamespace() ) );
 		$wgOut->redirect( $parentTitle->getFullUrl() );
 
 		// do not use $reason as it contains content of parent article/comment - not current ones that we delete in a loop
@@ -765,7 +773,9 @@ class ArticleCommentList {
 		$oTitle = $oRCCacheEntry->getTitle();
 		$namespace = $oTitle->getNamespace();
 
-		if ( MWNamespace::isTalk( $namespace ) && ArticleComment::isTitleComment( $oTitle ) ) {
+		$namespaceInfo = MediaWikiServices::getInstance()->getNamespaceInfo();
+
+		if ( $namespaceInfo->isTalk( $namespace ) && ArticleComment::isTitleComment( $oTitle ) ) {
 			$parts = ArticleComment::explode( $oTitle->getText() );
 			if ( $parts['title'] != '' ) {
 				$currentName = 'ArticleComments' . $parts['title'];
@@ -797,8 +807,10 @@ class ArticleCommentList {
 			return true;
 		}
 
+		$namespaceInfo = MediaWikiServices::getInstance()->getNamespaceInfo();
+
 		if ( !is_null( $oTitle )
-			&& MWNamespace::isTalk( $namespace )
+			&& $namespaceInfo->isTalk( $namespace )
 			&& ArticleComment::isTitleComment( $oTitle )
 		) {
 			$parts = ArticleComment::explode( $oTitle->getFullText() );
@@ -813,7 +825,7 @@ class ArticleCommentList {
 
 					$text = $title->getText();
 
-					$title = Title::newFromText( $text, MWNamespace::getSubject( $namespace ) );
+					$title = Title::newFromText( $text, $namespaceInfo->getSubject( $namespace ) );
 
 					if ( $title instanceof Title ) {
 						if ( ArticleComment::isBlog() ) {
@@ -856,9 +868,12 @@ class ArticleCommentList {
 		// Only handle comments
 		global $wgArticleCommentsNamespaces;
 		$ns = $title->getNamespace();
+
+		$namespaceInfo = MediaWikiServices::getInstance()->getNamespaceInfo();
+
 		if (
-			!MWNamespace::isTalk( $ns ) ||
-			!in_array( MWNamespace::getSubject( $ns ), $wgArticleCommentsNamespaces ) ||
+			!$namespaceInfo->isTalk( $ns ) ||
+			!in_array( $namespaceInfo->getSubject( $ns ), $wgArticleCommentsNamespaces ) ||
 			!ArticleComment::isTitleComment( $title ) ) {
 			return true;
 		}
@@ -869,7 +884,7 @@ class ArticleCommentList {
 		}
 
 		$parts = ArticleComment::explode( $title->getText() );
-		$redirectTitle = Title::newFromText( $parts['title'], MWNamespace::getSubject( $title->getNamespace() ) );
+		$redirectTitle = Title::newFromText( $parts['title'], $namespaceInfo->getSubject( $title->getNamespace() ) );
 		if ( empty( $redirectTitle ) ) {
 			return true;
 		}
@@ -977,8 +992,10 @@ class ArticleCommentList {
 	static public function onConfirmEdit(
 		$SimpleCaptcha, $editPage, $newtext, $section, $merged, &$result
 	): bool {
+		$namespaceInfo = MediaWikiServices::getInstance()->getNamespaceInfo();
+
 		$title = $editPage->getArticle()->getTitle();
-		if ( MWNamespace::isTalk( $title->getNamespace() ) && ArticleComment::isTitleComment( $title ) ) {
+		if ( $namespaceInfo->isTalk( $title->getNamespace() ) && ArticleComment::isTitleComment( $title ) ) {
 			$result = true;	// omit captcha
 			return false;
 		}
@@ -1003,10 +1020,12 @@ class ArticleCommentList {
 		$rcNamespace = $rc->getAttribute( 'rc_namespace' );
 		$title = Title::newFromText( $rcTitle, $rcNamespace );
 
-		if ( MWNamespace::isTalk( $rcNamespace ) && ArticleComment::isTitleComment( $title ) ) {
+		$namespaceInfo = MediaWikiServices::getInstance()->getNamespaceInfo();
+
+		if ( $namespaceInfo->isTalk( $rcNamespace ) && ArticleComment::isTitleComment( $title ) ) {
 			$parts = ArticleComment::explode( $rcTitle );
 
-			$titleMainArticle = Title::newFromText( $parts['title'], MWNamespace::getSubject( $rcNamespace ) );
+			$titleMainArticle = Title::newFromText( $parts['title'], $namespaceInfo->getSubject( $rcNamespace ) );
 
 			// fb#15143
 			if ( $titleMainArticle instanceof Title ) {
