@@ -559,7 +559,9 @@ class ArticleComment {
 	}
 
 	public function getData( $master = false ) {
-		global $wgUser, $wgBlankImgUrl, $wgMemc;
+		global $wgUser, $wgBlankImgUrl;
+
+		$memc = ObjectCache::getLocalClusterInstance();
 
 		$title = $this->getTitle();
 		$commentId = $title->getArticleId();
@@ -576,7 +578,7 @@ class ArticleComment {
 			self::CACHE_VERSION
 		);
 
-		$data = $wgMemc->get( $articleDataKey );
+		$data = $memc->get( $articleDataKey );
 
 		if ( !empty( $data ) ) {
 			$data['timestamp'] = "<a href='" . $title->getFullUrl( [ 'permalink' => $data['id'] ] ) . '#comm-' . $data['id'] . "' class='permalink'>" . wfTimeFormatAgo( $data['rawmwtimestamp'] ) . "</a>";
@@ -663,7 +665,7 @@ class ArticleComment {
 			'isStaff' => $isStaff,
 		];
 
-		$wgMemc->set( $articleDataKey, $comment, self::AN_HOUR );
+		$memc->set( $articleDataKey, $comment, self::AN_HOUR );
 
 		if ( !( $comment['title'] instanceof Title ) ) {
 			$comment['title'] = Title::newFromText( $comment['title'], NS_TALK );
