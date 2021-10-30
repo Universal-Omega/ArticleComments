@@ -1,5 +1,5 @@
 <?php
-class ArticleCommentsController extends WikiaController {
+class ArticleCommentsController extends WikiaController2 {
 	use Wikia\Logger\Loggable;
 
 	private $dataLoaded = false;
