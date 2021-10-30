@@ -72,6 +72,6 @@ class ArticleCommentsHooks {
 	}
 
 	public static function onLoadExtensionSchemaUpdates( DatabaseUpdater $updater ) {
-		$updater->addExtensionTable( 'article_comments', MWInit::getExtensionsDirectory() . '/wikia/ArticleComments/sql/article_comments.sql' );
+		$updater->addExtensionTable( 'article_comments', __DIR__ . '/sql/article_comments.sql' );
 	}
 }
