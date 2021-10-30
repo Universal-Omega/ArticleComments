@@ -1128,11 +1128,12 @@ class ArticleComment {
 			case EditPage::AS_SUCCESS_NEW_ARTICLE:
 				$comment = ArticleComment::newFromArticle( $article );
 
-				// if ( $app->checkSkin( 'minervaneue' ) ) {
-					// $viewName = 'MobileComment';
-				// } else {
+				$out = RequestContext::getMain()->getOutput();
+				if ( $out->getSkin() instanceof SkinMinerva ) {
+					$viewName = 'MobileComment';
+				} else {
 					$viewName = 'Comment';
-				// }
+				}
 
 				$parameters = [
 					'comment' => $comment->getData( true ),
@@ -1547,6 +1548,7 @@ class ArticleComment {
 
 	static public function getSurrogateKey( $articleId ) {
 		global $wgCityId;
+
 		return 'Wiki_' . $wgCityId . '_ArticleComments_' . $articleId;
 	}
 
@@ -1558,7 +1560,9 @@ class ArticleComment {
 	public static function isLoadingOnDemand() {
 		global $wgArticleCommentsLoadOnDemand;
 
-		return $wgArticleCommentsLoadOnDemand /* && !$app->checkSkin( 'minervaneue' ) */;
+		$out = RequestContext::getMain()->getOutput();
+
+		return $wgArticleCommentsLoadOnDemand && !( $out->getSkin() instanceof SkinMinerva );
 	}
 
 	/**
@@ -1568,6 +1572,7 @@ class ArticleComment {
 	 */
 	static public function isMiniEditorEnabled() {
 		global $wgEnableMiniEditorExtForArticleComments;
+
 		return $wgEnableMiniEditorExtForArticleComments;
 	}
 
