@@ -255,11 +255,12 @@ class ArticleCommentsAjax {
 		$error = 0;
 		$text = $pagination = '';
 		$method = 'CommentList';
-		$app = F::app();
-		$isMobile = $app->checkSkin( 'wikiamobile' );
+
+		$out = RequestContext::getMain()->getOutput();
+		$isMobile = $out->getSkin() instanceof SkinMinerva;
 
 		if ( $isMobile ) {
-			$method = 'WikiaMobile' . $method;
+			$method = 'Mobile' . $method;
 		}
 
 		$title = Title::newFromID( $articleId );
@@ -268,7 +269,7 @@ class ArticleCommentsAjax {
 		} else {
 			$listing = ArticleCommentList::newFromTitle( $title );
 			$comments = $listing->getCommentPages( false, $page );
-			$text = $app->getView( 'ArticleComments', $method, [ 'commentListRaw' => $comments, 'page' => $page, 'useMaster' => false ] )->render();
+			$text = F::app()->getView( 'ArticleComments', $method, [ 'commentListRaw' => $comments, 'page' => $page, 'useMaster' => false ] )->render();
 			$pagination = ( !$isMobile ) ? $listing->doPagination( $listing->getCountAll(), count( $comments ), $page === false ? 1 : $page, $title ) : '';
 		}
 
@@ -286,6 +287,7 @@ class ArticleCommentsAjax {
 	 */
 	static public function getConvertedContent( $content = '' ) {
 		global $wgEnableMiniEditorExtForArticleComments, $wgRequest;
+
 		if ( $wgEnableMiniEditorExtForArticleComments && !empty( $content ) ) {
 			$convertToFormat = $wgRequest->getVal( 'convertToFormat', '' );
 
