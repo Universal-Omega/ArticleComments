@@ -3,6 +3,39 @@
 use Wikia\PageHeader\Button;
 
 class ArticleCommentsHooks {
+	public static function onRegistration() {
+		global $wgAjaxExportList;
+
+		$wgAjaxExportList[] = 'ArticleCommentsHooks::ArticleCommentsAjax';
+	}
+
+	public static function ArticleCommentsAjax() {
+		global $wgRequest;
+		$method = $wgRequest->getVal( 'method', false );
+
+		if ( method_exists( 'ArticleCommentsAjax', $method ) ) {
+			$data = ArticleCommentsAjax::$method();
+
+			if ( is_array( $data ) ) {
+				// send array as JSON
+				$json = json_encode( $data );
+				$response = new AjaxResponse( $json );
+				$response->setContentType( 'application/json; charset=utf-8' );
+			} else {
+				// send text as text/html
+				$response = new AjaxResponse( $data );
+				$response->setContentType( 'text/html; charset=utf-8' );
+			}
+
+			// Don't cache requests made to edit comment, see SOC-788
+			if ( $method == 'axEdit' ) {
+				$response->setCacheDuration( 0 );
+			}
+
+			return $response;
+		}
+	}
+
 	/**
 	 * @param Title $title
 	 * @param array $buttons
