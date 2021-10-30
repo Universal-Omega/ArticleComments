@@ -6,6 +6,10 @@ class ArticleCommentsHooks {
 	public static function onRegistration() {
 		global $wgAjaxExportList;
 
+		define( 'ARTICLECOMMENTORDERCOOKIE_NAME', 'articlecommentorder' );
+		define( 'ARTICLECOMMENTORDERCOOKIE_EXPIRE', 60 * 60 * 24 * 365 );
+		define( 'ARTICLECOMMENT_PREFIX', '@comment-' );
+
 		$wgAjaxExportList[] = 'ArticleCommentsHooks::ArticleCommentsAjax';
 	}
 
