@@ -145,7 +145,7 @@ class ArticleCommentsController {
 		return true;
 	}
 
-	public static function getFullUrl( $method, $params = null, $format = null ) {
+	public static function getUrl( $method, $params = null, $format = null ) {
 		return null;
 	}
 }
