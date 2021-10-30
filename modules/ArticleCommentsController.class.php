@@ -7,7 +7,6 @@
 use MediaWiki\Logger\LoggerFactory;
 
 class ArticleCommentsController {
-
 	private $dataLoaded = false;
 	private static $content = null;
 
