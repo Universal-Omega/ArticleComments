@@ -41,7 +41,7 @@
 		"ArticleFromTitle": "ArticleCommentList::ArticleFromTitle",
 		"UserMailer::NotifyUser": "ArticleCommentInit::ArticleCommentNotifyUser",
 		"UndeleteComplete": "ArticleCommentList::undeleteComplete",
-		"userCan": "ArticleComment::userCan",
+		"getUserPermissionsErrors": "ArticleComment::getUserPermissionsErrors",
 		"HAWelcomeGetPrefixText": "ArticleCommentInit::HAWelcomeGetPrefixText",
 		"SpecialMovepageAfterMove": "ArticleComment::moveComments",
 		"ParserFirstCallInit": "ArticleComment::metadataParserInit",
