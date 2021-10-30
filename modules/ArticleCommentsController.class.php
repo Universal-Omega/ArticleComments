@@ -1,21 +1,31 @@
 <?php
-class ArticleCommentsController extends WikiaController {
-	use Wikia\Logger\Loggable;
+
+/**
+ * @TODO use REST endpoint?
+ */
+
+use MediaWiki\Logger\LoggerFactory;
+
+class ArticleCommentsController {
 
 	private $dataLoaded = false;
 	private static $content = null;
 
+	private $request;
+
 	public function executeIndex() {
-		$this->page = $this->wg->request->getVal( 'page', 1 );
+		$this->title = RequestContext::getMain()->getTitle();
+
+		$this->request = RequestContext::getMain()->getRequest();
+		$this->page = $this->request->getVal( 'page', 1 );
 		$this->isLoadingOnDemand = ArticleComment::isLoadingOnDemand();
 		$this->isMiniEditorEnabled = ArticleComment::isMiniEditorEnabled();
 
 		if ( $this->isLoadingOnDemand ) {
-			$this->response->setJsVar( 'wgArticleCommentsLoadOnDemand', true );
-
+			// $this->response->setJsVar( 'wgArticleCommentsLoadOnDemand', true );
 		} else {
-			$this->getCommentsData( $this->wg->Title, $this->page );
-			$this->response->addAsset( 'articlecomments' . ( $this->isMiniEditorEnabled ? '_mini_editor' : '' ) . '_scss' );
+			$this->getCommentsData( $title, $this->page );
+			// $this->response->addAsset( 'articlecomments' . ( $this->isMiniEditorEnabled ? '_mini_editor' : '' ) . '_scss' );
 		}
 	}
 
@@ -25,7 +35,9 @@ class ArticleCommentsController extends WikiaController {
 	 */
 	public function content() {
 		//this is coming via ajax we need to set correct wgTitle ourselves
-		global $wgTitle, $wgArticleCommentsReadOnlyMode;
+		global $wgTitle, $wgArticleCommentsReadOnlyMode, $wgArticleCommentsLoadOnDemand;
+
+		$originalTitle = $wgTitle;
 
 		$articleId = $this->request->getVal( 'articleId', null );
 		$page = $this->request->getVal( 'page', 1 );
@@ -36,27 +48,27 @@ class ArticleCommentsController extends WikiaController {
 		}
 
 		if ( !( $title instanceof Title ) ) {
-			$title = $this->wg->title;
+			$title = $originalTitle;
 		}
 
 		// If articleId is invalid, don't trigger a fatal error, just throw a 404 and return nothing.
 		if ( $title === null ) {
-			$this->response->setCode( 404 );
-			$this->skipRendering();
+			$out = RequestContext::getMain()->getOutput();
+
+			$out->setStatusCode( 404 );
+			// $this->skipRendering();
 			return;
 		}
 
 		$this->getCommentsData( $title, $page );
 		$this->isMiniEditorEnabled = ArticleComment::isMiniEditorEnabled();
-		$this->setVal('readOnly', $wgArticleCommentsReadOnlyMode);
 
-		// Uncomment this when surrogate key purging works
-		//Wikia::setSurrogateKeysHeaders( ArticleComment::getSurrogateKey( $articleId ) );
+		$this->request->setVal( 'readOnly', $wgArticleCommentsReadOnlyMode );
 
 		// When lazy loading this request it shouldn't be cached in the browser
-		if ( !empty( $this->wg->ArticleCommentsLoadOnDemand ) ) {
-			$this->response->setCachePolicy( WikiaResponse::CACHE_PRIVATE );
-			$this->response->setCacheValidity( WikiaResponse::CACHE_DISABLED );
+		if ( !empty( $wgArticleCommentsLoadOnDemand ) ) {
+			// $this->response->setCachePolicy( WikiaResponse::CACHE_PRIVATE );
+			// $this->response->setCacheValidity( WikiaResponse::CACHE_DISABLED );
 		}
 	}
 
@@ -86,7 +98,8 @@ class ArticleCommentsController extends WikiaController {
 
 		if ( empty( $data ) ) {
 			// Seems like we should always have data, let's leave a log somewhere if this happens
-			Wikia\Logger\WikiaLogger::instance()->error(
+			$logger = LoggerFactory::getInstance( 'ArticleComments' );
+			$logger->error(
 				__METHOD__ . ' - no data, this should not happen',
 				[
 					'exception' => new Exception()
@@ -94,9 +107,12 @@ class ArticleCommentsController extends WikiaController {
 			);
 		}
 
-		$this->ajaxicon = $this->wg->StylePath.'/common/images/ajax.gif';
+		$this->ajaxicon = $wgStylePath . 'extensions/ArticleComments/images/ajax.gif';
 		$this->pagesCount = ( $data['commentsPerPage'] > 0 ) ? ceil( $data['countComments'] / $data['commentsPerPage'] ) : 0;
-		$this->response->setValues( $data );
+
+		foreach ( $data as $key => $value ) {
+			$this->request->setVal( $key, $value );
+		}
 
 		return $data;
 	}
@@ -105,18 +121,17 @@ class ArticleCommentsController extends WikiaController {
 		if ( !empty( self::$content ) ) {
 			$afterContentHookText .= self::$content;
 		}
+
 		return true;
 	}
 
 	public static function onBeforePageDisplay( OutputPage $out, Skin $skin ): bool {
 		if ( class_exists( 'ArticleCommentInit' ) && ArticleCommentInit::ArticleCommentCheck() ) {
-			$app = F::app();
-
 			// This is the actual entry point for Article Comment generation
-			self::$content = $app->sendRequest( 'ArticleComments', 'index' );
+			self::$content = /*$app->sendRequest( 'ArticleComments', 'index' )*/ '';
 
 			// Load MiniEditor assets
-			if ( ArticleComment::isMiniEditorEnabled() ) {
+			/* if ( ArticleComment::isMiniEditorEnabled() ) {
 				$app->sendRequest( 'MiniEditor', 'loadAssets', [
 					'loadStyles' => !ArticleComment::isLoadingOnDemand(),
 					'loadOnDemand' => true,
@@ -124,8 +139,13 @@ class ArticleCommentsController extends WikiaController {
 						'/extensions/wikia/MiniEditor/js/Wall/Wall.Animations.js'
 					]
 				] );
-			}
+			} */
 		}
+
 		return true;
+	}
+
+	public static function getFullUrl( $method, $params = null, $format = null ) {
+		return null;
 	}
 }
