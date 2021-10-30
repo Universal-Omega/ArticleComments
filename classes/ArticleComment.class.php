@@ -4,6 +4,7 @@
  */
 
 use MediaWiki\Logger\LoggerFactory;
+use MediaWiki\MediaWikiServices;
 
 class ArticleComment {
 
@@ -1627,7 +1628,7 @@ class ArticleComment {
 
 	/**
 	 * Manages permissions related to article and blog comments
-	 * Hook: userCan
+	 * Hook: getUserPermissionsErrors
 	 *
 	 * @param Title $title
 	 * @param User $user
@@ -1635,13 +1636,16 @@ class ArticleComment {
 	 * @param bool $result Whether $user can perform $action on $title
 	 * @return bool Whether to continue checking hooks
 	 */
-	static public function userCan( Title $title, User $user, string $action, &$result ): bool {
+	static public function getUserPermissionsErrors( Title $title, User $user, string $action, &$result ): bool {
 		global $wgArticleCommentsNamespaces, $wgEnableBlogArticles;
-		$commentsNS = $wgArticleCommentsNamespaces;
+
+		$commentsNS = $wgArticleCommentsNamespaces ?? [];
 		$ns = $title->getNamespace();
 
+		$namespaceInfo = MediaWikiServices::getInstance()->getNamespaceInfo();
+
 		// Only handle article and blog comments
-		if ( !in_array( MWNamespace::getSubject( $ns ), $commentsNS ) ||
+		if ( !in_array( $namespaceInfo->getSubject( $ns ), $commentsNS ) ||
 			!ArticleComment::isTitleComment( $title ) ) {
 			return true;
 		}
