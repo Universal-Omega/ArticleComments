@@ -1,25 +1,6 @@
 <?php
 
-/**
- * ArticleComments
- *
- * A ArticleComments extension for MediaWiki
- * Adding comment functionality on article pages
- *
- * @author Krzysztof Krzyżaniak <eloy@wikia.inc>
- * @author Maciej Błaszkowski (Marooned) <marooned at wikia-inc.com>
- * @date 2010-07-14
- * @copyright Copyright (C) 2010 Krzysztof Krzyżaniak, Wikia Inc.
- * @copyright Copyright (C) 2010 Maciej Błaszkowski, Wikia Inc.
- * @license http://www.gnu.org/copyleft/gpl.html GNU General Public License 2.0 or later
- * @package MediaWiki
- *
- * To activate this functionality, place this file in your extensions/
- * subdirectory, and add the following line to LocalSettings.php:
- *     require_once("$IP/extensions/wikia/ArticleComments/ArticleComments_setup.php");
- */
-
-use Wikia\Logger\WikiaLogger;
+use MediaWiki\Logger\LoggerFactory;
 
 class ArticleCommentsAjax {
 	/**
@@ -207,7 +188,9 @@ class ArticleCommentsAjax {
 		}
 
 		$response = ArticleComment::doPost( self::getConvertedContent( $wgRequest->getVal( 'wpArticleComment' ) ), $wgUser, $title, $parentId );
-		WikiaLogger::instance()->info( __METHOD__ . ' : Comment posted', [
+
+		$logger = LoggerFactory::getInstance( 'ArticleComments' );
+		$logger->info( __METHOD__ . ' : Comment posted', [
 			'skin' => $wgRequest->getVal( 'useskin' ),
 			'articleId' => $articleId,
 			'parentId' => $parentId,
