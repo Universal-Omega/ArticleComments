@@ -5,6 +5,8 @@
 
 use MediaWiki\Logger\LoggerFactory;
 use MediaWiki\MediaWikiServices;
+use MediaWiki\Revision\RevisionRecord;
+use MediaWiki\Revision\SlotRecord;
 
 class ArticleComment {
 
@@ -40,10 +42,10 @@ class ArticleComment {
 	/** @var Article */
 	public $mArticle;
 
-	/** @var Revision Last revision for author & time */
+	/** @var RevisionRecord Last revision for author & time */
 	public $mLastRevision;
 
-	/** @var Revision The revision used for displaying text */
+	/** @var RevisionRecord The revision used for displaying text */
 	public $mFirstRevision;
 
 	protected $minRevIdFromSlave;
@@ -226,7 +228,7 @@ class ArticleComment {
 			return true;
 		}
 
-		$this->setRawText( $this->mLastRevision->getText() );
+		$this->setRawText( $this->mLastRevision->getContent( SlotRecord::MAIN, RevisionRecord::RAW ) );
 
 		return true;
 	}
@@ -271,13 +273,13 @@ class ArticleComment {
 		}
 
 		// get user that created this comment
-		$authorId = $this->mFirstRevision->getUser();
+		$user = $this->mFirstRevision->getUser();
 
 		// Use user name lookup or IP address
-		if ( $authorId ) {
-			$this->mUser = User::newFromId( $authorId );
+		if ( $user && $user->getId() ) {
+			$this->mUser = User::newFromId( $user->getId() );
 		} else {
-			$this->mUser = User::newFromName( $this->mFirstRevision->getUserText(), false );
+			$this->mUser = $user ? User::newFromName( $user->getName(), false ) : null;
 		}
 
 		$this->isRevisionLoaded = true;
@@ -347,9 +349,10 @@ class ArticleComment {
 		}
 
 		// get revision objects
-		$this->mFirstRevision = Revision::newFromId( $this->mFirstRevId );
+		$this->mFirstRevision = MediaWikiServices::getInstance()->getRevisionLookup()
+			->getRevisionById( $this->mFirstRevId );
 
-		return !empty( $this->mFirstRevision ) && $this->mFirstRevision instanceof Revision;
+		return !empty( $this->mFirstRevision ) && $this->mFirstRevision instanceof RevisionRecord;
 	}
 
 	private function loadLastRevision() {
@@ -361,10 +364,11 @@ class ArticleComment {
 			// save one db query by just setting them to the same revision object
 			$this->mLastRevision = $this->mFirstRevision;
 		} else {
-			$this->mLastRevision = Revision::newFromId( $this->mLastRevId );
+			$this->mLastRevision = MediaWikiServices::getInstance()->getRevisionLookup()
+				->getRevisionById( $this->mLastRevId );
 		}
 
-		return !empty( $this->mLastRevision ) && $this->mLastRevision instanceof Revision;
+		return !empty( $this->mLastRevision ) && $this->mLastRevision instanceof RevisionRecord;
 	}
 
 	/**
@@ -772,18 +776,18 @@ class ArticleComment {
 	 * @deprecated use userCan directly on the comment's title object
 	 */
 	public function canEdit() {
-		global $wgUser;
+		$user = RequestContext::getMain()->getUser();
 
 		$isAuthor = false;
 
 		if ( $this->mFirstRevision ) {
-			$isAuthor = $this->mFirstRevision->getUser( Revision::RAW ) == $wgUser->getId() && !$wgUser->isAnon();
+			$isAuthor = $this->mFirstRevision->getUser( RevisionRecord::RAW )->getId() == $user->getId() && !$user->isAnon();
 		}
 
 		// prevent infinite loop for blogs - userCan hooked up in BlogLockdown
 		$canEdit = self::isBlog( $this->mTitle ) || $this->mTitle->userCan( "edit" );
 
-		$isAllowed = $wgUser->isAllowed( 'commentedit' );
+		$isAllowed = $user->isAllowed( 'commentedit' );
 
 		$res = $isAuthor || ( $isAllowed && $canEdit );
 
@@ -843,7 +847,7 @@ class ArticleComment {
 
 		$vars = [
 			'canEdit' => $canEdit,
-			'comment' => htmlentities( ArticleCommentsAjax::getConvertedContent( $this->mLastRevision->getText() ) ),
+			'comment' => htmlentities( ArticleCommentsAjax::getConvertedContent( $this->mLastRevision->getContent( SlotRecord::MAIN, RevisionRecord::RAW ) ) ),
 			'isReadOnly' => wfReadOnly(),
 			'isMiniEditorEnabled' => ArticleComment::isMiniEditorEnabled(),
 			'stylePath' => $wgStylePath,
@@ -913,14 +917,15 @@ class ArticleComment {
 
 		// If the edit was successful, set revision info returned by edit method
 		if ( isset( $status ) && $status->isOK() ) {
-			/** @var Revision $rev */
+			/** @var RevisionRecord $rev */
 			$rev = $status->revision;
 			$this->mLastRevision = $rev;
 			$this->mLastRevId = $rev->getId();
 		} else {
 			// Edit failed, let's work with slave data
 			$this->mLastRevId = $this->mTitle->getLatestRevID();
-			$this->mLastRevision = Revision::newFromId( $this->mLastRevId );
+			$this->mLastRevision = MediaWikiServices::getInstance()->getRevisionLookup()
+				->getRevisionById( $this->mLastRevId );
 		}
 
 		return $res;
