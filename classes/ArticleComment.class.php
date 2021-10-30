@@ -57,9 +57,11 @@ class ArticleComment {
 	 * @param Title $title
 	 */
 	public function __construct( Title $title ) {
+		$namespaceInfo = MediaWikiServices::getInstance()->getNamespaceInfo();
+
 		$this->mTitle = $title;
 		$this->mNamespace = $title->getNamespace();
-		$this->mNamespaceTalk = MWNamespace::getTalk( $this->mNamespace );
+		$this->mNamespaceTalk = $namespaceInfo->getTalk( $this->mNamespace );
 		$this->mProps = false;
 	}
 
@@ -108,9 +110,11 @@ class ArticleComment {
 			$flags = 0;
 		}
 
+		$namespaceInfo = MediaWikiServices::getInstance()->getNamespaceInfo();
+
 		$titleText = $title->getDBkey();
 		$prefix =  $titleText . '/' . ARTICLECOMMENT_PREFIX;
-		$commentNamespace = MWNamespace::getTalk( $title->getNamespace() );
+		$commentNamespace = $namespaceInfo->getTalk( $title->getNamespace() );
 
 		$latest = ( new WikiaSQL() )
 			->SELECT( 'page_id' )
@@ -591,10 +595,12 @@ class ArticleComment {
 		$links = []; // action links with only a URL
 		$replyButton = '';
 
+		$namespaceInfo = MediaWikiServices::getInstance()->getNamespaceInfo();
+
 		// this is for blogs we want to know if commenting on it is enabled
 		// we cannot check it using $title->getBaseText, as this returns main namespace title
 		// the subjectpage for $parts title is something like 'User blog comment:SomeUser/BlogTitle' which is fine
-		$articleTitle = Title::makeTitle( MWNamespace::getSubject( $this->mNamespace ), $parts['title'] );
+		$articleTitle = Title::makeTitle( $namespaceInfo->getSubject( $this->mNamespace ), $parts['title'] );
 		$commentingAllowed = ArticleComment::userCanCommentOn( $articleTitle );
 
 		if ( ( count( $parts['partsStripped'] ) == 1 ) && $commentingAllowed ) {
@@ -710,10 +716,11 @@ class ArticleComment {
 			return null;
 		}
 
+		$namespaceInfo = MediaWikiServices::getInstance()->getNamespaceInfo();
 		$title = null;
 		$parts = self::explode( $this->mTitle->getDBkey() );
 		if ( $parts['title'] != '' ) {
-			$title = Title::makeTitle( MWNamespace::getSubject( $this->mNamespace ), $parts['title'] );
+			$title = Title::makeTitle( $namespaceInfo->getSubject( $this->mNamespace ), $parts['title'] );
 		}
 		return $title;
 	}
@@ -1040,8 +1047,11 @@ class ArticleComment {
 			$commentTitle =
 				ArticleCommentsTitle::format( $parentArticle->getTitle(), $user );
 		}
+
+		$namespaceInfo = MediaWikiServices::getInstance()->getNamespaceInfo();
+
 		$commentTitleText = $commentTitle;
-		$commentTitle = Title::newFromText( $commentTitle, MWNamespace::getTalk( $title->getNamespace() ) );
+		$commentTitle = Title::newFromText( $commentTitle, $namespaceInfo->getTalk( $title->getNamespace() ) );
 
 		if ( !( $commentTitle instanceof Title ) ) {
 			if ( !empty( $parentId ) ) {
@@ -1242,8 +1252,10 @@ class ArticleComment {
 			$article_id = $oRC->getAttribute( 'rc_cur_id' );
 			$title = Title::newFromText( $title, $namespace );
 
+			$namespaceInfo = MediaWikiServices::getInstance()->getNamespaceInfo();
+
 			// TODO: review
-			if ( MWNamespace::isTalk( $namespace ) &&
+			if ( $namespaceInfo->isTalk( $namespace ) &&
 				ArticleComment::isTitleComment( $title ) &&
 				!empty( $article_id ) ) {
 
@@ -1259,6 +1271,7 @@ class ArticleComment {
 				}
 			}
 		}
+
 		return true;
 	}
 
@@ -1275,7 +1288,9 @@ class ArticleComment {
 	static public function ComposeCommonMail( $title, &$keys, &$message, $editor ) {
 		global $wgEnotifUseRealName;
 
-		if ( MWNamespace::isTalk( $title->getNamespace() ) && ArticleComment::isTitleComment( $title ) ) {
+		$namespaceInfo = MediaWikiServices::getInstance()->getNamespaceInfo();
+
+		if ( $namespaceInfo->isTalk( $title->getNamespace() ) && ArticleComment::isTitleComment( $title ) ) {
 			if ( !is_array( $keys ) ) {
 				$keys = [ ];
 			}
@@ -1309,9 +1324,11 @@ class ArticleComment {
 		$parts = self::explode( $oCommentTitle->getDBkey() );
 		$commentTitleText = implode( '/', $parts['partsOriginal'] );
 
+		$namespaceInfo = MediaWikiServices::getInstance()->getNamespaceInfo();
+
 		$newCommentTitle = Title::newFromText(
 			sprintf( '%s/%s', $oNewTitle->getText(), $commentTitleText ),
-			MWNamespace::getTalk( $oNewTitle->getNamespace() ) );
+			$namespaceInfo->getTalk( $oNewTitle->getNamespace() ) );
 
 		$taskParams['page'] = $oCommentTitle->getFullText();
 		$taskParams['newpage'] = $newCommentTitle->getFullText();
@@ -1353,9 +1370,11 @@ class ArticleComment {
 		$parts = self::explode( $oCommentTitle->getDBkey() );
 		$commentTitleText = implode( '/', $parts['partsOriginal'] );
 
+		$namespaceInfo = MediaWikiServices::getInstance()->getNamespaceInfo();
+
 		$newCommentTitle = Title::newFromText(
 			sprintf( '%s/%s', $oNewTitle->getText(), $commentTitleText ),
-			MWNamespace::getTalk( $oNewTitle->getNamespace() ) );
+			$namespaceInfo->getTalk( $oNewTitle->getNamespace() ) );
 
 		$error = $oCommentTitle->moveTo( $newCommentTitle, false, $reason, false );
 
