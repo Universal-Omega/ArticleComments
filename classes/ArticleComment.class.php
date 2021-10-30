@@ -100,10 +100,10 @@ class ArticleComment {
 	 */
 	static public function latestFromTitle( Title $title, array $param = [] ) {
 		if ( empty( $param['useSlave'] ) ) {
-			$dbh = wfGetDB( DB_MASTER );
+			$dbh = wfGetDB( DB_PRIMARY );
 			$flags = Title::GAID_FOR_UPDATE;
 		} else {
-			$dbh = wfGetDB( DB_SLAVE );
+			$dbh = wfGetDB( DB_REPLICA );
 			$flags = 0;
 		}
 
@@ -297,12 +297,12 @@ class ArticleComment {
 		}
 
 		if ( !$useMaster ) {
-			$this->mFirstRevId = $this->getFirstRevID( DB_SLAVE );
+			$this->mFirstRevId = $this->getFirstRevID( DB_REPLICA );
 		}
 
 		// Fall back to master if not on slave or if we wanted master in the first place
 		if ( empty( $this->mFirstRevId ) ) {
-			$this->mFirstRevId = $this->getFirstRevID( DB_MASTER );
+			$this->mFirstRevId = $this->getFirstRevID( DB_PRIMARY );
 		}
 
 		return !empty( $this->mFirstRevId );
@@ -519,7 +519,7 @@ class ArticleComment {
 	private function getFirstRevID( $db_conn ) {
 		$id = false;
 
-		if ( $db_conn == DB_SLAVE && isset( $this->minRevIdFromSlave ) ) {
+		if ( $db_conn == DB_REPLICA && isset( $this->minRevIdFromSlave ) ) {
 			return $this->minRevIdFromSlave;
 		}
 
@@ -537,7 +537,7 @@ class ArticleComment {
 	}
 
 	public function setFirstRevId( $value, $db_conn ) {
-		if ( $db_conn == DB_SLAVE ) {
+		if ( $db_conn == DB_REPLICA ) {
 			$this->minRevIdFromSlave = $value;
 		}
 	}
