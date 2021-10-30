@@ -120,13 +120,13 @@ class ArticleCommentList {
 	 */
 
 	public function getCommentPages( $master = true, $page = 1 ) {
-		global $wgRequest;
+		$request = RequestContext::getMain()->getRequest();
 
 		// initialize list of comment ids if not done already
 		if ( $this->mCommentsAll === false ) {
 			$this->getCommentList( $master );
 		}
-		$showall = $wgRequest->getText( 'showall', false );
+		$showall = $request->getText( 'showall', false );
 
 		// pagination
 		if ( $page !== false && ( $showall != 1 || $this->getCountAllNested() > 200 /*see RT#64641*/ ) ) {
@@ -183,10 +183,12 @@ class ArticleCommentList {
 	 * @return array
 	 */
 	public function getCommentList( $master = true ) {
-		global $wgRequest, $wgMemc;
+		global $wgMemc;
 
-		$action = $wgRequest->getText( 'action', false );
-        $title = $this->getTitle();
+		$request = RequestContext::getMain()->getRequest();
+
+		$action = $request->getText( 'action', false );
+		$title = $this->getTitle();
 		$memckey = self::getCacheKey( $title );
 
 		/**
@@ -338,9 +340,9 @@ class ArticleCommentList {
 	 * @return array data for comments list
 	 */
 	public function getData( $page = 1 ) {
-		$wg = F::app()->wg;
+		global $wgUser;
 
-		$isBlocked = $wg->User->isBlocked();
+		$isBlocked = $wgUser->getBlock();
 
 		$isReadOnly = wfReadOnly();
 
@@ -359,20 +361,20 @@ class ArticleCommentList {
 		$pagination = $this->doPagination( $countComments, count( $comments ), $page );
 
 		return [
-			'avatar' => AvatarService::renderAvatar( $wg->User->getName(), 50 ),
-			'userurl' => AvatarService::getUrl( $wg->User->getName() ),
+			'avatar' => AvatarService::renderAvatar( $wgUser->getName(), 50 ),
+			'userurl' => AvatarService::getUrl( $wgUser->getName() ),
 			'commentListRaw' => $comments,
 			'commentingAllowed' => ArticleComment::userCanCommentOn( $this->mTitle ),
 			'commentsPerPage' => $this->mMaxPerPage,
 			'countComments' => $countComments,
 			'countCommentsNested' => $countCommentsNested,
-			'isAnon' => $wg->User->isAnon(),
+			'isAnon' => $wgUser->isAnon(),
 			'isBlocked' => $isBlocked,
 			'isReadOnly' => $isReadOnly,
 			'page' => $page,
 			'pagination' => $pagination,
 			'reason' => $isBlocked ? $this->blockedPage() : '',
-			'stylePath' => $wg->StylePath,
+			'stylePath' => $wgStylePath,
 			'title' => $this->mTitle,
 		];
 	} // end getData();
@@ -844,6 +846,8 @@ class ArticleCommentList {
 	 * @return bool
 	 */
 	static public function ArticleFromTitle( Title &$title, &$article ) {
+		global $wgRequest;
+
 		// Don't bother checking for redirects if we're not loading this article for the current request
 		if ( !self::isTitleForCurrentRequest( $title ) ) {
 			return true;
@@ -872,7 +876,7 @@ class ArticleCommentList {
 
 		$query = [];
 		$commentId = $title->getArticleID();
-		$permalink = F::app()->wg->Request->getInt( 'permalink', 0 );
+		$permalink = $wgRequest->getInt( 'permalink', 0 );
 
 		// Use comment ID if available - https://wikia.fogbugz.com/f/cases/11179
 		if ( $commentId !== 0 ) {
@@ -887,7 +891,8 @@ class ArticleCommentList {
 			}
 		}
 
-		F::app()->wg->Out->redirect( $redirectTitle->getFullUrl( $query ) );
+		$out = RequestContext::getMain()->getOutput();
+		$out->redirect( $redirectTitle->getFullUrl( $query ) );
 
 		return true;
 	}
@@ -902,11 +907,13 @@ class ArticleCommentList {
 	 * @return bool
 	 */
 	static private function isTitleForCurrentRequest( Title $title ) {
-		if ( empty( F::app()->wg->Title ) ) {
+		$requestTitle = RequestContext::getMain()->getTitle();
+
+		if ( empty( $requestTitle ) ) {
 			return false;
 		}
 
-		if ( $title->getPrefixedDBkey() != F::app()->wg->Title->getPrefixedDBkey() ) {
+		if ( $title->getPrefixedDBkey() != $requestTitle->getPrefixedDBkey() ) {
 			return false;
 		}
 
@@ -914,7 +921,7 @@ class ArticleCommentList {
 	}
 
 	static private function canSetRedirect() {
-		$req = F::app()->wg->Request;
+		$req = RequestContext::getMain()->getRequest();
 		$redirect = $req->getText( 'redirect', false );
 		$diff = $req->getText( 'diff', '' );
 		$oldId = $req->getText( 'oldid', '' );
