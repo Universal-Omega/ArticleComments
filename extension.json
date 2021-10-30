@@ -19,10 +19,37 @@
 		]
 	},
 	"AutoloadClasses": {
-		"ArticleCommentInit": "classes/ArticleCommentInit.class.php"
+		"ArticleCommentInit": "classes/ArticleCommentInit.class.php",
+		"ArticleComment": "classes/ArticleComment.class.php",
+		"ArticleCommentList": "classes/ArticleCommentList.class.php",
+		"ArticleCommentsAjax": "classes/ArticleCommentsAjax.class.php",
+		"ArticleCommentsTitle": "classes/ArticleCommentsTitle.class.php",
+		"ArticleCommentsController": "modules/ArticleCommentsController.class.php",
+		"ArticleCommentsHooks": "ArticleCommentsHooks.class.php"
 	},
 	"Hooks": {
-		"": ""
+		"ArticleDelete": "ArticleCommentList::articleDelete",
+		"ArticleDeleteComplete": "ArticleCommentList::articleDeleteComplete",
+		"ArticleRevisionUndeleted": "ArticleCommentList::undeleteComments",
+		"RecentChange_save": "ArticleComment::watchlistNotify",
+		"ChangesListMakeSecureName": "ArticleCommentList::makeChangesListKey",
+		"ChangesListInsertArticleLink": "ArticleCommentList::ChangesListInsertArticleLink",
+		"ComposeCommonSubjectMail": "ArticleComment::ComposeCommonMail",
+		"ComposeCommonBodyMail": "ArticleComment::ComposeCommonMail",
+		"Parser::InjectTOCitem": "ArticleCommentInit::InjectTOCitem",
+		"ConfirmEdit::onConfirmEdit": "ArticleCommentList::onConfirmEdit",
+		"ArticleFromTitle": "ArticleCommentList::ArticleFromTitle",
+		"UserMailer::NotifyUser": "ArticleCommentInit::ArticleCommentNotifyUser",
+		"UndeleteComplete": "ArticleCommentList::undeleteComplete",
+		"userCan": "ArticleComment::userCan",
+		"HAWelcomeGetPrefixText": "ArticleCommentInit::HAWelcomeGetPrefixText",
+		"SpecialMovepageAfterMove": "ArticleComment::moveComments",
+		"ParserFirstCallInit": "ArticleComment::metadataParserInit",
+		"BeforePageDisplay": "ArticleCommentsController::onBeforePageDisplay",
+		"SkinAfterContent": "ArticleCommentsController::onSkinAfterContent",
+		"FilePageImageUsageSingleLink": "ArticleCommentInit::onFilePageImageUsageSingleLink",
+		"AfterPageHeaderButtons": "ArticleCommentsHooks::onAfterPageHeaderButtons",
+		"LoadExtensionSchemaUpdates": "ArticleCommentsHooks::onLoadExtensionSchemaUpdates"
 	},
 	"manifest_version": 2
 }
