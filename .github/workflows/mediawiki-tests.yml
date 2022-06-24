@@ -11,6 +11,7 @@ jobs:
     name: "${{ matrix.mw }} | PHP ${{ matrix.php }} (${{ matrix.stage }})"
 
     strategy:
+      fail-fast: false
       matrix:
         include:
           # Latest stable MediaWiki - PHP 7.3 (phan)
