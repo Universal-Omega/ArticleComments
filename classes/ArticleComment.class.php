@@ -1400,7 +1400,7 @@ class ArticleComment {
 	 * @return bool
 	 */
 	static public function moveComments( MovePageForm $form , Title $oOldTitle , Title $oNewTitle ): bool {
-		global $wgRC2UDPEnabled, $wgMaxCommentsToMove, $wgEnableMultiDeleteExt, $wgCityId;
+		global $wgRC2UDPEnabled, $wgMaxCommentsToMove, $wgEnableMultiDeleteExt, $wgDBname;
 
 		if ( !$form->getUser()->isAllowed( 'move' ) ) {
 			return true;
@@ -1478,8 +1478,8 @@ class ArticleComment {
 					'reason' 	=> $form->reason,
 					'lang'		=> '',
 					'cat'		=> '',
-					'selwikia'	=> $wgCityId,
-					'user'		=> Wikia::BOT_USER
+					'selwiki'	=> $wgDBname,
+					'user'		=> 'MediaWiki default'
 				];
 
 				for ( $i = $finish + 1; $i < count( $comments ); $i++ ) {
@@ -1574,9 +1574,9 @@ class ArticleComment {
 	}
 
 	static public function getSurrogateKey( $articleId ) {
-		global $wgCityId;
+		global $wgDBname;
 
-		return 'Wiki_' . $wgCityId . '_ArticleComments_' . $articleId;
+		return 'Wiki_' . $wgDBname . '_ArticleComments_' . $articleId;
 	}
 
 	/**
