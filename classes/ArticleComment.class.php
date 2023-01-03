@@ -3,7 +3,10 @@
  * ArticleComment is article, this class is used for manipulation on
  */
 
-use Wikia\Logger\WikiaLogger;
+use MediaWiki\Logger\LoggerFactory;
+use MediaWiki\MediaWikiServices;
+use MediaWiki\Revision\RevisionRecord;
+use MediaWiki\Revision\SlotRecord;
 
 class ArticleComment {
 
@@ -39,10 +42,10 @@ class ArticleComment {
 	/** @var Article */
 	public $mArticle;
 
-	/** @var Revision Last revision for author & time */
+	/** @var RevisionRecord Last revision for author & time */
 	public $mLastRevision;
 
-	/** @var Revision The revision used for displaying text */
+	/** @var RevisionRecord The revision used for displaying text */
 	public $mFirstRevision;
 
 	protected $minRevIdFromSlave;
@@ -56,9 +59,11 @@ class ArticleComment {
 	 * @param Title $title
 	 */
 	public function __construct( Title $title ) {
+		$namespaceInfo = MediaWikiServices::getInstance()->getNamespaceInfo();
+
 		$this->mTitle = $title;
 		$this->mNamespace = $title->getNamespace();
-		$this->mNamespaceTalk = MWNamespace::getTalk( $this->mNamespace );
+		$this->mNamespaceTalk = $namespaceInfo->getTalk( $this->mNamespace );
 		$this->mProps = false;
 	}
 
@@ -100,16 +105,18 @@ class ArticleComment {
 	 */
 	static public function latestFromTitle( Title $title, array $param = [] ) {
 		if ( empty( $param['useSlave'] ) ) {
-			$dbh = wfGetDB( DB_MASTER );
+			$dbh = wfGetDB( DB_PRIMARY );
 			$flags = Title::GAID_FOR_UPDATE;
 		} else {
-			$dbh = wfGetDB( DB_SLAVE );
+			$dbh = wfGetDB( DB_REPLICA );
 			$flags = 0;
 		}
 
+		$namespaceInfo = MediaWikiServices::getInstance()->getNamespaceInfo();
+
 		$titleText = $title->getDBkey();
 		$prefix =  $titleText . '/' . ARTICLECOMMENT_PREFIX;
-		$commentNamespace = MWNamespace::getTalk( $title->getNamespace() );
+		$commentNamespace = $namespaceInfo->getTalk( $title->getNamespace() );
 
 		$latest = ( new WikiaSQL() )
 			->SELECT( 'page_id' )
@@ -221,7 +228,7 @@ class ArticleComment {
 			return true;
 		}
 
-		$this->setRawText( $this->mLastRevision->getText() );
+		$this->setRawText( $this->mLastRevision->getContent( SlotRecord::MAIN, RevisionRecord::RAW ) );
 
 		return true;
 	}
@@ -241,36 +248,38 @@ class ArticleComment {
 			return true;
 		}
 
+		$logger = LoggerFactory::getInstance( 'ArticleComments' );
+
 		// Get revision IDs
 		if ( !$this->loadFirstRevId( $master ) || !$this->loadLastRevId( $master ) ) {
-			WikiaLogger::instance()->error( 'Unable to load revision IDs', [
-				'issue' => 'SOC-1540',
+			$logger->error( 'Unable to load revision IDs', [
 				'firstRevId' => $this->mFirstRevId,
 				'lastRevId' => $this->mLastRevId,
 				'title' => print_r( $this->mTitle, true ),
 			] );
+
 			return false;
 		}
 
 		// Get revision objects
 		if ( !$this->loadFirstRevision() || !$this->loadLastRevision() ) {
-			WikiaLogger::instance()->error( 'Unable to load revision objects', [
-				'issue' => 'SOC-1540',
+			$logger->error( 'Unable to load revision objects', [
 				'firstRevId' => $this->mFirstRevId,
 				'lastRevId' => $this->mLastRevId,
 				'title' => print_r( $this->mTitle, true ),
 			] );
+
 			return false;
 		}
 
 		// get user that created this comment
-		$authorId = $this->mFirstRevision->getUser();
+		$user = $this->mFirstRevision->getUser();
 
-		// SUS-3363: Use user name lookup or IP address
-		if ( $authorId ) {
-			$this->mUser = User::newFromId( $authorId );
+		// Use user name lookup or IP address
+		if ( $user && $user->getId() ) {
+			$this->mUser = User::newFromId( $user->getId() );
 		} else {
-			$this->mUser = User::newFromName( $this->mFirstRevision->getUserText(), false );
+			$this->mUser = $user ? User::newFromName( $user->getName(), false ) : null;
 		}
 
 		$this->isRevisionLoaded = true;
@@ -295,12 +304,12 @@ class ArticleComment {
 		}
 
 		if ( !$useMaster ) {
-			$this->mFirstRevId = $this->getFirstRevID( DB_SLAVE );
+			$this->mFirstRevId = $this->getFirstRevID( DB_REPLICA );
 		}
 
 		// Fall back to master if not on slave or if we wanted master in the first place
 		if ( empty( $this->mFirstRevId ) ) {
-			$this->mFirstRevId = $this->getFirstRevID( DB_MASTER );
+			$this->mFirstRevId = $this->getFirstRevID( DB_PRIMARY );
 		}
 
 		return !empty( $this->mFirstRevId );
@@ -340,9 +349,10 @@ class ArticleComment {
 		}
 
 		// get revision objects
-		$this->mFirstRevision = Revision::newFromId( $this->mFirstRevId );
+		$this->mFirstRevision = MediaWikiServices::getInstance()->getRevisionLookup()
+			->getRevisionById( $this->mFirstRevId );
 
-		return !empty( $this->mFirstRevision ) && $this->mFirstRevision instanceof Revision;
+		return !empty( $this->mFirstRevision ) && $this->mFirstRevision instanceof RevisionRecord;
 	}
 
 	private function loadLastRevision() {
@@ -354,10 +364,11 @@ class ArticleComment {
 			// save one db query by just setting them to the same revision object
 			$this->mLastRevision = $this->mFirstRevision;
 		} else {
-			$this->mLastRevision = Revision::newFromId( $this->mLastRevId );
+			$this->mLastRevision = MediaWikiServices::getInstance()->getRevisionLookup()
+				->getRevisionById( $this->mLastRevId );
 		}
 
-		return !empty( $this->mLastRevision ) && $this->mLastRevision instanceof Revision;
+		return !empty( $this->mLastRevision ) && $this->mLastRevision instanceof RevisionRecord;
 	}
 
 	/**
@@ -399,8 +410,6 @@ class ArticleComment {
 	 * Parse the comment content in a lazy fashion: when either getText() or getHeadItems() is called
 	 */
 	private function parseText() {
-		wfProfileIn( __METHOD__ );
-
 		// SUS-1557: only load from DB if raw text was not set manually
 		if ( !is_string( $this->mRawtext ) ) {
 			$this->load();
@@ -444,8 +453,6 @@ class ArticleComment {
 		$this->mText = $data['text'];
 		$this->mHeadItems = $data['headitems'];
 		$this->mMetadata = $data['metadata'];
-
-		wfProfileOut( __METHOD__ );
 	}
 
 	/**
@@ -521,7 +528,7 @@ class ArticleComment {
 	private function getFirstRevID( $db_conn ) {
 		$id = false;
 
-		if ( $db_conn == DB_SLAVE && isset( $this->minRevIdFromSlave ) ) {
+		if ( $db_conn == DB_REPLICA && isset( $this->minRevIdFromSlave ) ) {
 			return $this->minRevIdFromSlave;
 		}
 
@@ -539,7 +546,7 @@ class ArticleComment {
 	}
 
 	public function setFirstRevId( $value, $db_conn ) {
-		if ( $db_conn == DB_SLAVE ) {
+		if ( $db_conn == DB_REPLICA ) {
 			$this->minRevIdFromSlave = $value;
 		}
 	}
@@ -552,11 +559,13 @@ class ArticleComment {
 	}
 
 	public function getData( $master = false ) {
-		global $wgUser, $wgBlankImgUrl, $wgMemc;
+		global $wgUser, $wgBlankImgUrl;
+
+		$memc = ObjectCache::getLocalClusterInstance();
 
 		$title = $this->getTitle();
 		$commentId = $title->getArticleId();
-		$canDelete = !count( $title->getUserPermissionsErrors( 'delete', F::app()->wg->User, false, [] ) );
+		$canDelete = !count( $title->getUserPermissionsErrors( 'delete', $wgUser, false, [] ) );
 
 		// vary cache on permission as well so it changes we can show it to a user
 		$articleDataKey = wfMemcKey(
@@ -569,7 +578,7 @@ class ArticleComment {
 			self::CACHE_VERSION
 		);
 
-		$data = $wgMemc->get( $articleDataKey );
+		$data = $memc->get( $articleDataKey );
 
 		if ( !empty( $data ) ) {
 			$data['timestamp'] = "<a href='" . $title->getFullUrl( [ 'permalink' => $data['id'] ] ) . '#comm-' . $data['id'] . "' class='permalink'>" . wfTimeFormatAgo( $data['rawmwtimestamp'] ) . "</a>";
@@ -592,10 +601,12 @@ class ArticleComment {
 		$links = []; // action links with only a URL
 		$replyButton = '';
 
+		$namespaceInfo = MediaWikiServices::getInstance()->getNamespaceInfo();
+
 		// this is for blogs we want to know if commenting on it is enabled
 		// we cannot check it using $title->getBaseText, as this returns main namespace title
 		// the subjectpage for $parts title is something like 'User blog comment:SomeUser/BlogTitle' which is fine
-		$articleTitle = Title::makeTitle( MWNamespace::getSubject( $this->mNamespace ), $parts['title'] );
+		$articleTitle = Title::makeTitle( $namespaceInfo->getSubject( $this->mNamespace ), $parts['title'] );
 		$commentingAllowed = ArticleComment::userCanCommentOn( $articleTitle );
 
 		if ( ( count( $parts['partsStripped'] ) == 1 ) && $commentingAllowed ) {
@@ -654,7 +665,7 @@ class ArticleComment {
 			'isStaff' => $isStaff,
 		];
 
-		$wgMemc->set( $articleDataKey, $comment, self::AN_HOUR );
+		$memc->set( $articleDataKey, $comment, self::AN_HOUR );
 
 		if ( !( $comment['title'] instanceof Title ) ) {
 			$comment['title'] = Title::newFromText( $comment['title'], NS_TALK );
@@ -711,10 +722,11 @@ class ArticleComment {
 			return null;
 		}
 
+		$namespaceInfo = MediaWikiServices::getInstance()->getNamespaceInfo();
 		$title = null;
 		$parts = self::explode( $this->mTitle->getDBkey() );
 		if ( $parts['title'] != '' ) {
-			$title = Title::makeTitle( MWNamespace::getSubject( $this->mNamespace ), $parts['title'] );
+			$title = Title::makeTitle( $namespaceInfo->getSubject( $this->mNamespace ), $parts['title'] );
 		}
 		return $title;
 	}
@@ -766,18 +778,18 @@ class ArticleComment {
 	 * @deprecated use userCan directly on the comment's title object
 	 */
 	public function canEdit() {
-		global $wgUser;
+		$user = RequestContext::getMain()->getUser();
 
 		$isAuthor = false;
 
 		if ( $this->mFirstRevision ) {
-			$isAuthor = $this->mFirstRevision->getUser( Revision::RAW ) == $wgUser->getId() && !$wgUser->isAnon();
+			$isAuthor = $this->mFirstRevision->getUser( RevisionRecord::RAW )->getId() == $user->getId() && !$user->isAnon();
 		}
 
 		// prevent infinite loop for blogs - userCan hooked up in BlogLockdown
 		$canEdit = self::isBlog( $this->mTitle ) || $this->mTitle->userCan( "edit" );
 
-		$isAllowed = $wgUser->isAllowed( 'commentedit' );
+		$isAllowed = $user->isAllowed( 'commentedit' );
 
 		$res = $isAuthor || ( $isAllowed && $canEdit );
 
@@ -837,7 +849,7 @@ class ArticleComment {
 
 		$vars = [
 			'canEdit' => $canEdit,
-			'comment' => htmlentities( ArticleCommentsAjax::getConvertedContent( $this->mLastRevision->getText() ) ),
+			'comment' => htmlentities( ArticleCommentsAjax::getConvertedContent( $this->mLastRevision->getContent( SlotRecord::MAIN, RevisionRecord::RAW ) ) ),
 			'isReadOnly' => wfReadOnly(),
 			'isMiniEditorEnabled' => ArticleComment::isMiniEditorEnabled(),
 			'stylePath' => $wgStylePath,
@@ -845,7 +857,7 @@ class ArticleComment {
 			'articleFullUrl' => $this->mTitle->getFullUrl(),
 		];
 
-		return F::app()->getView( 'ArticleComments', 'Edit', $vars )->render();
+		return '' /* F::app()->getView( 'ArticleComments', 'Edit', $vars )->render() */;
 	}
 
 	/**
@@ -907,14 +919,15 @@ class ArticleComment {
 
 		// If the edit was successful, set revision info returned by edit method
 		if ( isset( $status ) && $status->isOK() ) {
-			/** @var Revision $rev */
+			/** @var RevisionRecord $rev */
 			$rev = $status->revision;
 			$this->mLastRevision = $rev;
 			$this->mLastRevId = $rev->getId();
 		} else {
 			// Edit failed, let's work with slave data
 			$this->mLastRevId = $this->mTitle->getLatestRevID();
-			$this->mLastRevision = Revision::newFromId( $this->mLastRevId );
+			$this->mLastRevision = MediaWikiServices::getInstance()->getRevisionLookup()
+				->getRevisionById( $this->mLastRevId );
 		}
 
 		return $res;
@@ -952,12 +965,12 @@ class ArticleComment {
 
 		$status = $editPage->internalAttemptSave( $result, $bot );
 
-		// SUS-1188
 		if ( !$status->isOK() ) {
-			WikiaLogger::instance()->error( __METHOD__ . ' - failed SUS-1188', [
-				'hook_error' => (string) $editPage->hookError,
+			$logger = LoggerFactory::getInstance( 'ArticleComments' );
+			$logger->error( __METHOD__ . ' - failed', [
+				'hook_error' => (string)$editPage->hookError,
 				'edit_status' => $status,
-				'edit_result' => (array) $result,
+				'edit_result' => (array)$result,
 				'exception' => new Exception( 'EditPage::internalAttemptSave failed', $status->value ),
 				'is_bot_bool' => $bot,
 				'title' => $editPage->getTitle()->getPrefixedDBkey(),
@@ -1021,10 +1034,14 @@ class ArticleComment {
 
 				// if $parentTitle is empty the logging below will be executed
 			}
-			// FB#2875 (log data for further debugging)
+
+			$logger = LoggerFactory::getInstance( 'ArticleComments' );
+
+			// log data for further debugging
 			if ( is_null( $parentArticle ) ) {
-				$debugTitle = empty( $title ) ? '--EMPTY--' : $title->getText(); // BugId:2646
-				WikiaLogger::instance()->error( 'Failed to create Article object', [
+				$debugTitle = empty( $title ) ? '--EMPTY--' : $title->getText();
+
+				$logger->error( 'Failed to create Article object', [
 					'method' => __METHOD__,
 					'parentId' => $parentId,
 					'title' => $debugTitle,
@@ -1037,12 +1054,15 @@ class ArticleComment {
 			$commentTitle =
 				ArticleCommentsTitle::format( $parentArticle->getTitle(), $user );
 		}
+
+		$namespaceInfo = MediaWikiServices::getInstance()->getNamespaceInfo();
+
 		$commentTitleText = $commentTitle;
-		$commentTitle = Title::newFromText( $commentTitle, MWNamespace::getTalk( $title->getNamespace() ) );
+		$commentTitle = Title::newFromText( $commentTitle, $namespaceInfo->getTalk( $title->getNamespace() ) );
 
 		if ( !( $commentTitle instanceof Title ) ) {
 			if ( !empty( $parentId ) ) {
-				WikiaLogger::instance()->error( 'Failed to create commentTitle', [
+				$logger->error( 'Failed to create commentTitle', [
 					'method' => __METHOD__,
 					'parentId' => $parentId,
 					'commentTitleText' => $commentTitleText
@@ -1125,10 +1145,10 @@ class ArticleComment {
 			case EditPage::AS_SUCCESS_UPDATE:
 			case EditPage::AS_SUCCESS_NEW_ARTICLE:
 				$comment = ArticleComment::newFromArticle( $article );
-				$app = F::app();
 
-				if ( $app->checkSkin( 'wikiamobile' ) ) {
-					$viewName = 'WikiaMobileComment';
+				$out = RequestContext::getMain()->getOutput();
+				if ( $out->getSkin() instanceof SkinMinerva ) {
+					$viewName = 'MobileComment';
 				} else {
 					$viewName = 'Comment';
 				}
@@ -1153,7 +1173,7 @@ class ArticleComment {
 				$message = false;
 
 				// commit before purging
-				wfGetDB( DB_MASTER )->commit();
+				wfGetDB( DB_PRIMARY )->commit();
 
 				ArticleCommentList::purgeCache( $parentPageTitle );
 
@@ -1164,7 +1184,8 @@ class ArticleComment {
 
 				$message = wfMessage( 'article-comments-error' )->escaped();
 
-				WikiaLogger::instance()->error( __METHOD__ . ' - PLATFORM-1311', [
+				$logger = LoggerFactory::getInstance( 'ArticleComments' );
+				$logger->error( __METHOD__, [
 					'status' => $status->value,
 					'reason' => 'article-comments-error',
 					'name' => $article->getTitle()->getPrefixedDBkey(),
@@ -1238,8 +1259,10 @@ class ArticleComment {
 			$article_id = $oRC->getAttribute( 'rc_cur_id' );
 			$title = Title::newFromText( $title, $namespace );
 
+			$namespaceInfo = MediaWikiServices::getInstance()->getNamespaceInfo();
+
 			// TODO: review
-			if ( MWNamespace::isTalk( $namespace ) &&
+			if ( $namespaceInfo->isTalk( $namespace ) &&
 				ArticleComment::isTitleComment( $title ) &&
 				!empty( $article_id ) ) {
 
@@ -1255,6 +1278,7 @@ class ArticleComment {
 				}
 			}
 		}
+
 		return true;
 	}
 
@@ -1271,7 +1295,9 @@ class ArticleComment {
 	static public function ComposeCommonMail( $title, &$keys, &$message, $editor ) {
 		global $wgEnotifUseRealName;
 
-		if ( MWNamespace::isTalk( $title->getNamespace() ) && ArticleComment::isTitleComment( $title ) ) {
+		$namespaceInfo = MediaWikiServices::getInstance()->getNamespaceInfo();
+
+		if ( $namespaceInfo->isTalk( $title->getNamespace() ) && ArticleComment::isTitleComment( $title ) ) {
 			if ( !is_array( $keys ) ) {
 				$keys = [ ];
 			}
@@ -1305,9 +1331,11 @@ class ArticleComment {
 		$parts = self::explode( $oCommentTitle->getDBkey() );
 		$commentTitleText = implode( '/', $parts['partsOriginal'] );
 
+		$namespaceInfo = MediaWikiServices::getInstance()->getNamespaceInfo();
+
 		$newCommentTitle = Title::newFromText(
 			sprintf( '%s/%s', $oNewTitle->getText(), $commentTitleText ),
-			MWNamespace::getTalk( $oNewTitle->getNamespace() ) );
+			$namespaceInfo->getTalk( $oNewTitle->getNamespace() ) );
 
 		$taskParams['page'] = $oCommentTitle->getFullText();
 		$taskParams['newpage'] = $newCommentTitle->getFullText();
@@ -1316,7 +1344,8 @@ class ArticleComment {
 		$task->call( 'move', $taskParams );
 		$submit_id = $task->queue();
 
-		WikiaLogger::instance()->debug( 'Added move task', [
+		$logger = LoggerFactory::getInstance( 'ArticleComments' );
+		$logger->debug( 'Added move task', [
 			'method' => __METHOD__,
 			'taskId' => $submit_id,
 			'page' => $taskParams['page'],
@@ -1348,9 +1377,11 @@ class ArticleComment {
 		$parts = self::explode( $oCommentTitle->getDBkey() );
 		$commentTitleText = implode( '/', $parts['partsOriginal'] );
 
+		$namespaceInfo = MediaWikiServices::getInstance()->getNamespaceInfo();
+
 		$newCommentTitle = Title::newFromText(
 			sprintf( '%s/%s', $oNewTitle->getText(), $commentTitleText ),
-			MWNamespace::getTalk( $oNewTitle->getNamespace() ) );
+			$namespaceInfo->getTalk( $oNewTitle->getNamespace() ) );
 
 		$error = $oCommentTitle->moveTo( $newCommentTitle, false, $reason, false );
 
@@ -1369,7 +1400,7 @@ class ArticleComment {
 	 * @return bool
 	 */
 	static public function moveComments( MovePageForm $form , Title $oOldTitle , Title $oNewTitle ): bool {
-		global $wgRC2UDPEnabled, $wgMaxCommentsToMove, $wgEnableMultiDeleteExt, $wgCityId;
+		global $wgRC2UDPEnabled, $wgMaxCommentsToMove, $wgEnableMultiDeleteExt, $wgDBname;
 
 		if ( !$form->getUser()->isAllowed( 'move' ) ) {
 			return true;
@@ -1378,6 +1409,8 @@ class ArticleComment {
 		if ( $form->getUser()->isBlocked() ) {
 			return true;
 		}
+
+		$logger = LoggerFactory::getInstance( 'ArticleComments' );
 
 		$commentList = ArticleCommentList::newFromTitle( $oOldTitle );
 		$comments = $commentList->getCommentPages( true, false );
@@ -1399,7 +1432,7 @@ class ArticleComment {
 				# move comment level #1
 				$error = self::moveComment( $oCommentTitle, $oNewTitle, $form->reason );
 				if ( $error !== true ) {
-					WikiaLogger::instance()->error( 'Cannot move level 1 blog comments', [
+					$logger->error( 'Cannot move level 1 blog comments', [
 						'method' => __METHOD__,
 						'oldCommentTitle' => $oCommentTitle->getPrefixedText(),
 						'newCommentTitle' => $oNewTitle->getPrefixedText(),
@@ -1420,7 +1453,7 @@ class ArticleComment {
 						# move comment level #2
 						$error = self::moveComment( $oCommentTitle, $oNewTitle, $form->reason );
 						if ( $error !== true ) {
-							WikiaLogger::instance()->error( 'Cannot move level 2 blog comments', [
+							$logger->error( 'Cannot move level 2 blog comments', [
 								'method' => __METHOD__,
 								'oldCommentTitle' => $oCommentTitle->getPrefixedText(),
 								'newCommentTitle' => $oNewTitle->getPrefixedText(),
@@ -1445,8 +1478,8 @@ class ArticleComment {
 					'reason' 	=> $form->reason,
 					'lang'		=> '',
 					'cat'		=> '',
-					'selwikia'	=> $wgCityId,
-					'user'		=> Wikia::BOT_USER
+					'selwiki'	=> $wgDBname,
+					'user'		=> 'MediaWiki default'
 				];
 
 				for ( $i = $finish + 1; $i < count( $comments ); $i++ ) {
@@ -1466,7 +1499,7 @@ class ArticleComment {
 			$listing = ArticleCommentList::newFromTitle( $oNewTitle );
 			$listing->purge();
 		} else {
-			WikiaLogger::instance()->error( 'Cannot move article comments; no comments found', [
+			$logger->error( 'Cannot move article comments; no comments found', [
 				'method' => __METHOD__,
 				'oldTitle' => $oOldTitle->getPrefixedText(),
 			] );
@@ -1541,8 +1574,9 @@ class ArticleComment {
 	}
 
 	static public function getSurrogateKey( $articleId ) {
-		global $wgCityId;
-		return 'Wiki_' . $wgCityId . '_ArticleComments_' . $articleId;
+		global $wgDBname;
+
+		return 'Wiki_' . $wgDBname . '_ArticleComments_' . $articleId;
 	}
 
 	/**
@@ -1550,9 +1584,12 @@ class ArticleComment {
 	 *
 	 * @return boolean
 	 */
-	static public function isLoadingOnDemand() {
-		$app = F::app();
-		return $app->wg->ArticleCommentsLoadOnDemand && !$app->checkSkin( 'wikiamobile' );
+	public static function isLoadingOnDemand() {
+		global $wgArticleCommentsLoadOnDemand;
+
+		$out = RequestContext::getMain()->getOutput();
+
+		return $wgArticleCommentsLoadOnDemand && !( $out->getSkin() instanceof SkinMinerva );
 	}
 
 	/**
@@ -1562,6 +1599,7 @@ class ArticleComment {
 	 */
 	static public function isMiniEditorEnabled() {
 		global $wgEnableMiniEditorExtForArticleComments;
+
 		return $wgEnableMiniEditorExtForArticleComments;
 	}
 
@@ -1616,7 +1654,7 @@ class ArticleComment {
 
 	/**
 	 * Manages permissions related to article and blog comments
-	 * Hook: userCan
+	 * Hook: getUserPermissionsErrors
 	 *
 	 * @param Title $title
 	 * @param User $user
@@ -1624,21 +1662,22 @@ class ArticleComment {
 	 * @param bool $result Whether $user can perform $action on $title
 	 * @return bool Whether to continue checking hooks
 	 */
-	static public function userCan( Title $title, User $user, string $action, &$result ): bool {
-		$wg = F::app()->wg;
-		$commentsNS = $wg->ArticleCommentsNamespaces;
+	static public function getUserPermissionsErrors( Title $title, User $user, string $action, &$result ): bool {
+		global $wgArticleCommentsNamespaces, $wgEnableBlogArticles;
+
+		$commentsNS = $wgArticleCommentsNamespaces ?? [];
 		$ns = $title->getNamespace();
 
+		$namespaceInfo = MediaWikiServices::getInstance()->getNamespaceInfo();
+
 		// Only handle article and blog comments
-		if ( !in_array( MWNamespace::getSubject( $ns ), $commentsNS ) ||
+		if ( !in_array( $namespaceInfo->getSubject( $ns ), $commentsNS ) ||
 			!ArticleComment::isTitleComment( $title ) ) {
 			return true;
 		}
 
-		wfProfileIn( __METHOD__ );
-
 		$comment = ArticleComment::newFromTitle( $title );
-		$isBlog = ( $wg->EnableBlogArticles && ArticleComment::isBlog( $title ) );
+		$isBlog = ( $wgEnableBlogArticles && ArticleComment::isBlog( $title ) );
 
 		switch ( $action ) {
 			// Creating article comments requires 'commentcreate' permission
@@ -1675,7 +1714,6 @@ class ArticleComment {
 				$result = $return = true;
 		}
 
-		wfProfileOut( __METHOD__ );
 		return $return;
 	}
 
@@ -1689,16 +1727,17 @@ class ArticleComment {
 	 * @return bool Whether $user can add a comment to $title
 	 */
 	static public function userCanCommentOn( Title $title, User $user = null ) {
-		$wg = F::app()->wg;
+		global $wgUser, $wgEnableBlogArticles;
+
 		if ( !( $user instanceof User ) ) {
-			$user = $wg->User;
+			$user = $wgUser;
 		}
 
 		if ( wfReadOnly() ) {
 			return false;
 		}
 
-		$isBlog = ( $wg->EnableBlogArticles && ArticleComment::isBlog( $title ) );
+		$isBlog = ( $wgEnableBlogArticles && ArticleComment::isBlog( $title ) );
 		if ( $isBlog ) {
 			$props = BlogArticle::getProps( $title->getArticleID() );
 			$commentingEnabled = isset( $props[ 'commenting' ] ) ? (bool) $props[ 'commenting' ] : true;
