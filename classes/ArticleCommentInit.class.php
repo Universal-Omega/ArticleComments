@@ -106,7 +106,7 @@ class ArticleCommentInit {
 	static function InjectTOCitem( $parser, &$toc, &$sublevelCount ) {
 		$out = RequestContext::getMain()->getOutput();
 
-		if ( self::ArticleCommentCheck() && !( $out->getSkin() instanceof SkinMinerva ) ) ) {
+		if ( self::ArticleCommentCheck() && !( $out->getSkin() instanceof SkinMinerva ) ) {
 			$tocnumber = ++$sublevelCount[1];
 
 			$toc .= Linker::tocLine( 'ArticleComments', wfMsg( 'article-comments-toc-item' ), $tocnumber, 1 );
