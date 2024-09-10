@@ -14,39 +14,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Latest stable MediaWiki - PHP 7.3 (phan)
-          - mw: 'REL1_36'
-            php: 7.3
-            php-docker: 73
-            experimental: false
-            stage: phan
-
           # Latest stable MediaWiki - PHP 7.4 (phan)
-          - mw: 'REL1_36'
+          - mw: 'REL1_39'
             php: 7.4
             php-docker: 74
             experimental: false
-            stage: phan
-
-          # Latest MediaWiki release branch - PHP 7.3 (phan)
-          - mw: 'REL1_37'
-            php: 7.3
-            php-docker: 73
-            experimental: true
-            stage: phan
-
-          # Latest MediaWiki release branch - PHP 7.4 (phan)
-          - mw: 'REL1_37'
-            php: 7.4
-            php-docker: 74
-            experimental: true
-            stage: phan
-
-          # Latest MediaWiki master - PHP 7.3 (phan)
-          - mw: 'master'
-            php: 7.3
-            php-docker: 73
-            experimental: true
             stage: phan
 
           # Latest MediaWiki master - PHP 7.4 (phan)
@@ -56,59 +28,17 @@ jobs:
             experimental: true
             stage: phan
 
-          # Latest stable MediaWiki - PHP 7.3 (coverage)
-          - mw: 'REL1_36'
-            php: 7.3
-            php-docker: 73
-            experimental: false
-            stage: coverage
-
-          # Latest MediaWiki release branch - PHP 7.3 (coverage)
-          - mw: 'REL1_37'
-            php: 7.3
-            php-docker: 73
-            experimental: false
-            stage: coverage
-
-          # Latest MediaWiki master - PHP 7.3 (coverage)
+          # Latest MediaWiki master - PHP 7.4 (coverage)
           - mw: 'master'
-            php: 7.3
-            php-docker: 73
+            php: 7.4
+            php-docker: 74
             experimental: false
             stage: coverage
-
-          # Latest stable MediaWiki - PHP 7.3 (phpunit-unit)
-          - mw: 'REL1_36'
-            php: 7.3
-            php-docker: 73
-            experimental: false
-            stage: phpunit-unit
 
           # Latest stable MediaWiki - PHP 7.4 (phpunit-unit)
-          - mw: 'REL1_36'
+          - mw: 'REL1_39'
             php: 7.4
             php-docker: 74
-            experimental: false
-            stage: phpunit-unit
-
-          # Latest MediaWiki release branch - PHP 7.3 (phpunit-unit)
-          - mw: 'REL1_37'
-            php: 7.3
-            php-docker: 73
-            experimental: false
-            stage: phpunit-unit
-
-          # Latest MediaWiki release branch - PHP 7.4 (phpunit-unit)
-          - mw: 'REL1_37'
-            php: 7.4
-            php-docker: 74
-            experimental: false
-            stage: phpunit-unit
-
-          # Latest MediaWiki master - PHP 7.3 (phpunit-unit)
-          - mw: 'master'
-            php: 7.3
-            php-docker: 73
             experimental: false
             stage: phpunit-unit
 
@@ -119,38 +49,10 @@ jobs:
             experimental: false
             stage: phpunit-unit
 
-          # Latest stable MediaWiki - PHP 7.3 (phpunit)
-          - mw: 'REL1_36'
-            php: 7.3
-            php-docker: 73
-            experimental: false
-            stage: phpunit
-
           # Latest stable MediaWiki - PHP 7.4 (phpunit)
-          - mw: 'REL1_36'
+          - mw: 'REL1_39'
             php: 7.4
             php-docker: 74
-            experimental: false
-            stage: phpunit
-
-          # Latest MediaWiki release branch - PHP 7.3 (phpunit)
-          - mw: 'REL1_37'
-            php: 7.3
-            php-docker: 73
-            experimental: false
-            stage: phpunit
-
-          # Latest MediaWiki release branch - PHP 7.4 (phpunit)
-          - mw: 'REL1_37'
-            php: 7.4
-            php-docker: 74
-            experimental: false
-            stage: phpunit
-
-          # Latest MediaWiki master - PHP 7.3 (phpunit)
-          - mw: 'master'
-            php: 7.3
-            php-docker: 73
             experimental: false
             stage: phpunit
 
@@ -158,132 +60,55 @@ jobs:
           - mw: 'master'
             php: 7.4
             php-docker: 74
+            experimental: true
+            stage: phpunit
+
+          # Latest MediaWiki master - PHP 8.1 (phpunit)
+          - mw: 'master'
+            php: 8.1
+            php-docker: 81
             experimental: false
             stage: phpunit
 
-          # Latest stable MediaWiki - PHP 7.3 (phpunit-standalone)
-#          - mw: 'REL1_36'
-#            php: 7.3
-#            php-docker: 73
-#            experimental: false
-#            stage: phpunit-standalone
-
-          # Latest stable MediaWiki - PHP 7.4 (phpunit-standalone)
-#          - mw: 'REL1_36'
-#            php: 7.4
-#            php-docker: 74
-#            experimental: false
-#            stage: phpunit-standalone
-
-          # Latest MediaWiki release branch - PHP 7.3 (phpunit-standalone)
-#          - mw: 'REL1_37'
-#            php: 7.3
-#            php-docker: 73
-#            experimental: false
-#            stage: phpunit-standalone
-
-          # Latest MediaWiki release branch - PHP 7.4 (phpunit-standalone)
-#          - mw: 'REL1_37'
-#            php: 7.4
-#            php-docker: 74
-#            experimental: false
-#            stage: phpunit-standalone
-
-          # Latest MediaWiki master - PHP 7.3 (phpunit-standalone)
-#          - mw: 'master'
-#            php: 7.3
-#            php-docker: 73
-#            experimental: false
-#            stage: phpunit-standalone
-
-          # Latest MediaWiki master - PHP 7.4 (phpunit-standalone)
-#          - mw: 'master'
-#            php: 7.4
-#            php-docker: 74
-#            experimental: false
-#            stage: phpunit-standalone
-
-          # Latest stable MediaWiki - PHP 7.3 (selenium)
-          - mw: 'REL1_36'
-            php: 7.3
-            php-docker: 73
+          # Latest stable MediaWiki - PHP 7.4 (selenium)
+          - mw: 'REL1_39'
+            php: 7.4
+            php-docker: 74
             experimental: false
             stage: selenium
 
-          # Latest MediaWiki release branch - PHP 7.3 (selenium)
-          - mw: 'REL1_37'
-            php: 7.3
-            php-docker: 73
+          # Latest MediaWiki master - PHP 7.4 (selenium)
+          - mw: 'master'
+            php: 7.4
+            php-docker: 74
             experimental: false
             stage: selenium
 
-          # Latest MediaWiki master - PHP 7.3 (selenium)
-          - mw: 'master'
-            php: 7.3
-            php-docker: 73
-            experimental: false
-            stage: selenium
-
-          # Latest stable MediaWiki - PHP 7.3 (qunit)
-          - mw: 'REL1_36'
-            php: 7.3
-            php-docker: 73
+          # Latest stable MediaWiki - PHP 7.4 (qunit)
+          - mw: 'REL1_39'
+            php: 7.4
+            php-docker: 74
             experimental: false
             stage: qunit
 
-          # Latest MediaWiki release branch - PHP 7.3 (qunit)
-          - mw: 'REL1_37'
-            php: 7.3
-            php-docker: 73
+          # Latest MediaWiki master - PHP 7.4 (qunit)
+          - mw: 'master'
+            php: 7.4
+            php-docker: 74
             experimental: false
             stage: qunit
 
-          # Latest MediaWiki master - PHP 7.3 (qunit)
-          - mw: 'master'
-            php: 7.3
-            php-docker: 73
-            experimental: false
-            stage: qunit
-            
-          # Latest stable MediaWiki - PHP 7.3 (npm-test)
-          - mw: 'REL1_36'
-            php: 7.3
-            php-docker: 73
+          # Latest stable MediaWiki - PHP 7.4 (npm-test)
+          - mw: 'REL1_39'
+            php: 7.4
+            php-docker: 74
             experimental: false
             stage: npm-test
-
-          # Latest MediaWiki release branch - PHP 7.3 (npm-test)
-          - mw: 'REL1_37'
-            php: 7.3
-            php-docker: 73
-            experimental: false
-            stage: npm-test
-
-          # Latest MediaWiki master - PHP 7.3 (npm-test)
-          - mw: 'master'
-            php: 7.3
-            php-docker: 73
-            experimental: false
-            stage: npm-test
-            
-          # Latest stable MediaWiki - PHP 7.3 (composer-test)
-          - mw: 'REL1_36'
-            php: 7.3
-            php-docker: 73
-            experimental: false
-            stage: composer-test
-
-          # Latest MediaWiki release branch - PHP 7.3 (composer-test)
-          - mw: 'REL1_37'
-            php: 7.3
-            php-docker: 73
-            experimental: false
-            stage: composer-test
-
-          # Latest MediaWiki master - PHP 7.3 (composer-test)
-          - mw: 'master'
-            php: 7.3
-            php-docker: 73
+  
+          # Latest stable MediaWiki - PHP 7.4 (composer-test)
+          - mw: 'REL1_39'
+            php: 7.4
+            php-docker: 74
             experimental: false
             stage: composer-test
 
@@ -297,13 +122,19 @@ jobs:
       PHAN_DOCKER_IMAGE: mediawiki-phan-php${{ matrix.php-docker }}
 
     steps:
-      - uses: actions/checkout@v2
+      - name: Cancel Previous Runs
+        uses: styfle/cancel-workflow-action@0.11.0
+        with:
+          access_token: ${{ github.token }}
+
+      - uses: actions/checkout@v3
 
       # /home/runner/cache/                               Cache
       # /home/runner/src/                                 Mediawiki installation
       # /home/runner/src/extensions/EXTENSION_NAME/       Clone of the extension repository
       # /home/runner/docker-images/                       Docker images which exported with docker-save command
-      # $GITHUB_WORKSPACE/.github/workflows/dependencies  Used by actions/cache
+      # $GITHUB_WORKSPACE/.github/workflows/dependencies  Necessary dependencies - YAML syntax
+      # $GITHUB_WORKSPACE/.github/workflows/globals.php   Add global configuration options for MediaWiki
       - name: Set up
         run: |
           echo MEDIAWIKI_VERSION="${{ matrix.mw }}" >> $GITHUB_ENV
@@ -337,7 +168,7 @@ jobs:
           fi
 
       - name: Cache docker image
-        uses: actions/cache@v2
+        uses: actions/cache@v3.3.1
         with:
           path: /home/runner/docker-images/${{ env.DOCKER_IMAGE }}
           key: ${{ env.DOCKER_IMAGE }}:${{ env.DOCKER_LATEST_TAG }}
@@ -349,7 +180,7 @@ jobs:
 
       - name: Cache quibble docker image
         if: ${{ matrix.stage == 'coverage' || matrix.stage == 'phan' }}
-        uses: actions/cache@v2
+        uses: actions/cache@v3.3.1
         with:
           path: /home/runner/docker-images/${{ env.QUIBBLE_DOCKER_IMAGE }}
           key: ${{ env.QUIBBLE_DOCKER_IMAGE }}:${{ env.QUIBBLE_DOCKER_LATEST_TAG }}
@@ -368,14 +199,24 @@ jobs:
             for dep in $DEPENDENCIES; do
               dependency=$(echo $dep | cut -d'|' -f1)
               repository=$(echo $dep | cut -sd'|' -f2)
-              branch=$(echo $dep | cut -sd'|' -f3)
-              git clone --recurse-submodules -b "${branch:-${MEDIAWIKI_VERSION}}" --depth 1 "${repository:-https://gerrit.wikimedia.org/r/${dep}}" src/"$(echo $dependency | cut -d'/' -f2,3)"
+              branch=$(echo $dep | rev | cut -sd'|' -f1 | rev)
+
+              if [ $repository == $branch ]; then
+                repository=""
+              fi
+
+              git clone --recurse-submodules -b "${branch:-${MEDIAWIKI_VERSION}}" --depth 1 "${repository:-https://gerrit.wikimedia.org/r/${dependency}}" src/"$(echo $dependency | cut -d'/' -f2,3)"
             done
           fi
+
+          if [ -e "$GITHUB_WORKSPACE"/.github/workflows/globals.php ]; then
+            echo 'require_once __DIR__ . "/../extensions/${{ github.event.repository.name }}/.github/workflows/globals.php";' >> src/includes/DevelopmentSettings.php
+          fi
+
           git -C src/ log -n 1 --format="%H"
 
       - name: Cache dependencies (composer and npm)
-        uses: actions/cache@v2
+        uses: actions/cache@v3.3.1
         with:
           path: /home/runner/cache
           key: ${{ runner.os }}-${{ env.MEDIAWIKI_VERSION }}-${{ hashFiles('**/*.lock') }}
@@ -392,6 +233,30 @@ jobs:
         run: |
           if [ -e composer.json ]; then
             composer install --prefer-dist --no-progress --no-interaction
+          fi
+
+      - name: Fix PHPCS violations
+        continue-on-error: true
+        if: ${{ github.event_name == 'pull_request' && matrix.stage == 'composer-test' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -e composer.json ]; then
+            composer install --prefer-dist --no-progress --no-interaction
+            composer fix
+            rm composer.lock
+            if ! git diff --exit-code --quiet; then
+              git config --global user.name "github-actions"
+              git config --global user.email "github-actions@users.noreply.github.com"
+              git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+              git checkout -b ${GITHUB_HEAD_REF}
+              git add .
+              git commit -am "CI: lint code to MediaWiki standards" -m "Check commit and GitHub actions for more details"
+              git pull origin ${GITHUB_HEAD_REF} --rebase
+              git push --set-upstream origin ${GITHUB_HEAD_REF}
+            else
+              echo "No changes to commit"
+            fi
           fi
 
       - name: Main Test
@@ -426,6 +291,7 @@ jobs:
               --color
           elif [ "${{ matrix.stage }}" == 'coverage' ] && [ -d src/extensions/"${{ github.event.repository.name }}"/tests/phpunit ]; then
             docker run \
+              --entrypoint quibble-with-supervisord \
               -e ZUUL_PROJECT=mediawiki/extensions/"${{ github.event.repository.name }}" \
               -v "$(pwd)"/cache:/cache \
               -v "$(pwd)"/src:/workspace/src \
@@ -436,6 +302,7 @@ jobs:
               -c mwext-phpunit-coverage
           elif [ "${{ matrix.stage }}" != 'coverage' ]; then
             docker run \
+              --entrypoint quibble-with-supervisord \
               -e ZUUL_PROJECT=mediawiki/extensions/"${{ github.event.repository.name }}" \
               -v "$(pwd)"/cache:/cache \
               -v "$(pwd)"/src:/workspace/src \
@@ -448,7 +315,7 @@ jobs:
 
       - name: Upload coverage to Codecov
         if: ${{ matrix.stage == 'coverage' }}
-        uses: codecov/codecov-action@v2
+        uses: codecov/codecov-action@v3
         with:
           directory: /home/runner/cover
 
