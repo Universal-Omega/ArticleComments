@@ -1,6 +1,7 @@
 <?php
 
 use MediaWiki\MediaWikiServices;
+use Wikimedia\Rdbms\DBConnRef;
 
 /**
  * ArticleCommentList is a listing, basically it's an array of comments
@@ -289,7 +290,7 @@ class ArticleCommentList {
 		return $pages;
 	}
 
-	public function getQueryWhere( DatabaseBase $dbr ) {
+	public function getQueryWhere( DBConnRef $dbr ) {
 		$like = "page_title" . $dbr->buildLike( sprintf( "%s/%s", $this->mText, ARTICLECOMMENT_PREFIX ), $dbr->anyString() );
 
 		$namespaceInfo = MediaWikiServices::getInstance()->getNamespaceInfo();
