@@ -36,7 +36,7 @@ class ArticleCommentsTitle {
 	 */
 	public static function format( Title $title, User $user, $now = null ): string {
 		return sprintf( '%s/%s%s-%s', $title->getText(), ARTICLECOMMENT_PREFIX,
-			$user->isLoggedIn() ? $user->getId() : $user->getName(), $now ?: wfTimestampNow() );
+			$user->isRegistered() ? $user->getId() : $user->getName(), $now ?: wfTimestampNow() );
 	}
 
 }

@@ -1,4 +1,7 @@
 <?php
+
+use MediaWiki\MediaWikiServices;
+
 class ArticleCommentInit {
 	public static $enable = null;
 	public static $commentByAnonMsg = null;
@@ -101,10 +104,12 @@ class ArticleCommentInit {
 	 * @return Bool true -- because it's a hook
 	 */
 	static function InjectTOCitem( $parser, &$toc, &$sublevelCount ) {
-		if ( self::ArticleCommentCheck() && !( F::app()->checkSkin( 'wikiamobile' ) ) ) {
+		$out = RequestContext::getMain()->getOutput();
+
+		if ( self::ArticleCommentCheck() && !( $out->getSkin() instanceof SkinMinerva ) ) {
 			$tocnumber = ++$sublevelCount[1];
 
-			$toc .= Linker::tocLine( 'WikiaArticleComments', wfMsg( 'article-comments-toc-item' ), $tocnumber, 1 );
+			$toc .= Linker::tocLine( 'ArticleComments', wfMsg( 'article-comments-toc-item' ), $tocnumber, 1 );
 		}
 		return true;
 	}
@@ -145,7 +150,6 @@ class ArticleCommentInit {
 	 * @return boolean
 	 */
 	static public function HAWelcomeGetPrefixText( &$prefixedText, Title $title ) {
-
 		if ( ArticleComment::isTitleComment( $title ) ) {
 			$title = $title->getSubjectPage();
 			$prefixedText = $title->getPrefixedText();
@@ -204,11 +208,12 @@ class ArticleCommentInit {
 	}
 
 	public static function getUserNameFromRevision( Title $title ) {
-		$rev = Revision::newFromId( $title->getLatestRevID() );
+		$rev = MediaWikiServices::getInstance()->getRevisionLookup()
+			->getRevisionById( $title->getLatestRevID() );
 
 		$userName = null;
 		if ( !empty( $rev ) ) {
-			$user = User::newFromId( $rev->getUser() );
+			$user = User::newFromId( $rev->getUser()->getId() );
 
 			if ( !empty( $user ) ) {
 				$userName = $user->getName();
@@ -234,9 +239,9 @@ class ArticleCommentInit {
 
 		// link to article comments section
 		if ( $contextTitle !== $title || $isHistory ) {
-			return $contextTitle->getLocalUrl() . '#WikiaArticleComments';
+			return $contextTitle->getLocalUrl() . '#ArticleComments';
 		}
 
-		return '#WikiaArticleComments';
+		return '#ArticleComments';
 	}
 }

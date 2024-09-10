@@ -1,5 +1,8 @@
 <?php
 
+use MediaWiki\MediaWikiServices;
+use Wikimedia\Rdbms\DBConnRef;
+
 /**
  * ArticleCommentList is a listing, basically it's an array of comments
  */
@@ -120,13 +123,13 @@ class ArticleCommentList {
 	 */
 
 	public function getCommentPages( $master = true, $page = 1 ) {
-		global $wgRequest;
+		$request = RequestContext::getMain()->getRequest();
 
 		// initialize list of comment ids if not done already
 		if ( $this->mCommentsAll === false ) {
 			$this->getCommentList( $master );
 		}
-		$showall = $wgRequest->getText( 'showall', false );
+		$showall = $request->getText( 'showall', false );
 
 		// pagination
 		if ( $page !== false && ( $showall != 1 || $this->getCountAllNested() > 200 /*see RT#64641*/ ) ) {
@@ -183,23 +186,25 @@ class ArticleCommentList {
 	 * @return array
 	 */
 	public function getCommentList( $master = true ) {
-		global $wgRequest, $wgMemc;
+		$memc = ObjectCache::getLocalClusterInstance();
 
-		$action = $wgRequest->getText( 'action', false );
-        $title = $this->getTitle();
+		$request = RequestContext::getMain()->getRequest();
+
+		$action = $request->getText( 'action', false );
+		$title = $this->getTitle();
 		$memckey = self::getCacheKey( $title );
 
 		/**
 		 * skip cache if purging or using master connection or in case of single comment
 		 */
 		if ( $action != 'purge' && !$master && empty( $this->mCommentId ) ) {
-			$this->mCommentsAll = $wgMemc->get( $memckey );
+			$this->mCommentsAll = $memc->get( $memckey );
 		}
 
 		if ( empty( $this->mCommentsAll ) ) {
 			$pages = [ ];
 			$subpages = [ ];
-			$dbr = wfGetDB( $master ? DB_MASTER : DB_SLAVE );
+			$dbr = wfGetDB( $master ? DB_PRIMARY : DB_REPLICA );
 
 			$table = [ 'page' ];
 			$vars = [ 'page_id', 'page_title' ];
@@ -242,7 +247,7 @@ class ArticleCommentList {
 			$this->mCommentsAll = $pages;
 
 			if ( empty( $this->mCommentId ) ) {
-				$wgMemc->set( $memckey, $this->mCommentsAll, 3600 );
+				$memc->set( $memckey, $this->mCommentsAll, 3600 );
 			}
 		}
 
@@ -267,7 +272,7 @@ class ArticleCommentList {
 	 * @return array
 	 */
 	public function getAllCommentPages() {
-		$dbr = wfGetDB( DB_MASTER );
+		$dbr = wfGetDB( DB_PRIMARY );
 
 		$res = $dbr->select(
 			[ 'page' ],
@@ -285,12 +290,14 @@ class ArticleCommentList {
 		return $pages;
 	}
 
-	public function getQueryWhere( DatabaseBase $dbr ) {
+	public function getQueryWhere( DBConnRef $dbr ) {
 		$like = "page_title" . $dbr->buildLike( sprintf( "%s/%s", $this->mText, ARTICLECOMMENT_PREFIX ), $dbr->anyString() );
-		$namspace = MWNamespace::getTalk( $this->getTitle()->getNamespace() );
+
+		$namespaceInfo = MediaWikiServices::getInstance()->getNamespaceInfo();
+		$namespace = $namespaceInfo->getTalk( $this->getTitle()->getNamespace() );
 
 		if ( empty( $this->mCommentId ) ) {
-			return [ $like, 'page_namespace' => $namspace ];
+			return [ $like, 'page_namespace' => $namespace ];
 		}
 
 		$ac = ArticleComment::newFromId( $this->mCommentId );
@@ -300,19 +307,21 @@ class ArticleCommentList {
 			$parent = $title->getDBkey();
 		}
 		$like = "page_title" . $dbr->buildLike( $parent, $dbr->anyString() );
-		return [ $like, 'page_namespace' => $namspace ];
+		return [ $like, 'page_namespace' => $namespace ];
 	}
 
 	private function getRemovedCommentPages( $oTitle ) {
-		$pages = [ ];
+		$pages = [];
+
+		$namespaceInfo = MediaWikiServices::getInstance()->getNamespaceInfo();
 
 		if ( $oTitle instanceof Title ) {
-			$dbr = wfGetDB( DB_SLAVE );
+			$dbr = wfGetDB( DB_REPLICA );
 			$res = $dbr->select(
 				[ 'archive' ],
 				[ 'ar_page_id', 'ar_title' ],
 				[
-					'ar_namespace' => MWNamespace::getTalk( $this->getTitle()->getNamespace() ),
+					'ar_namespace' => $namespaceInfo->getTalk( $this->getTitle()->getNamespace() ),
 					"ar_title" . $dbr->buildLike( sprintf( "%s/%s", $oTitle->getDBkey(), ARTICLECOMMENT_PREFIX ), $dbr->anyString() )
 				],
 				__METHOD__,
@@ -321,7 +330,7 @@ class ArticleCommentList {
 			while ( $row = $dbr->fetchObject( $res ) ) {
 				$pages[ $row->ar_page_id ] = [
 					'title' => $row->ar_title,
-					'nspace' => MWNamespace::getTalk( $this->getTitle()->getNamespace() )
+					'nspace' => $namespaceInfo->getTalk( $this->getTitle()->getNamespace() )
 				];
 			}
 			$dbr->freeResult( $res );
@@ -338,9 +347,9 @@ class ArticleCommentList {
 	 * @return array data for comments list
 	 */
 	public function getData( $page = 1 ) {
-		$wg = F::app()->wg;
+		global $wgUser;
 
-		$isBlocked = $wg->User->isBlocked();
+		$isBlocked = $wgUser->getBlock();
 
 		$isReadOnly = wfReadOnly();
 
@@ -359,20 +368,20 @@ class ArticleCommentList {
 		$pagination = $this->doPagination( $countComments, count( $comments ), $page );
 
 		return [
-			'avatar' => AvatarService::renderAvatar( $wg->User->getName(), 50 ),
-			'userurl' => AvatarService::getUrl( $wg->User->getName() ),
+			'avatar' => AvatarService::renderAvatar( $wgUser->getName(), 50 ),
+			'userurl' => AvatarService::getUrl( $wgUser->getName() ),
 			'commentListRaw' => $comments,
 			'commentingAllowed' => ArticleComment::userCanCommentOn( $this->mTitle ),
 			'commentsPerPage' => $this->mMaxPerPage,
 			'countComments' => $countComments,
 			'countCommentsNested' => $countCommentsNested,
-			'isAnon' => $wg->User->isAnon(),
+			'isAnon' => $wgUser->isAnon(),
 			'isBlocked' => $isBlocked,
 			'isReadOnly' => $isReadOnly,
 			'page' => $page,
 			'pagination' => $pagination,
 			'reason' => $isBlocked ? $this->blockedPage() : '',
-			'stylePath' => $wg->StylePath,
+			'stylePath' => $wgStylePath,
 			'title' => $this->mTitle,
 		];
 	} // end getData();
@@ -447,22 +456,26 @@ class ArticleCommentList {
 	 * @return String HTML text
 	 */
 	public function blockedPage() {
-		/** @var Language $wgLang */
-		global $wgUser, $wgLang, $wgContLang, $wgRequest;
+		$contLang = MediaWikiServices::getInstance()->getContentLanguage();
 
-		// macbre: prevent fatals in code below
-		if ( empty( $wgUser->mBlock ) ) {
+		$requestContext = RequestContext::getMain();
+		$lang = $requestContext->getLanguage();
+		$user = $requestContext->getUser();
+		$request = $requestContext->getRequest();
+
+		// prevent fatals in code below
+		if ( empty( $user->mBlock ) ) {
 			return '';
 		}
 
-		$block = $wgUser->mBlock;
+		$block = $user->mBlock;
 
 		list( $blockerName, $reason, $ip, $blockid, $blockTimestamp, $blockExpiry, $intended ) = [
-			$wgUser->blockedBy(),
-			$wgUser->blockedFor() ? $wgUser->blockedFor() : wfMessage( 'blockednoreason' )->text(),
-			$wgRequest->getIP(),
-			$wgUser->getBlockId(),
-			$wgLang->timeanddate( wfTimestamp( TS_MW, $block->mTimestamp ), true ),
+			$user->blockedBy(),
+			$user->blockedFor() ? $user->blockedFor() : wfMessage( 'blockednoreason' )->text(),
+			$request->getIP(),
+			$user->getBlockId(),
+			$lang->timeanddate( wfTimestamp( TS_MW, $block->mTimestamp ), true ),
 			$block->mExpiry,
 			$block->mAddress,
 		];
@@ -471,7 +484,7 @@ class ArticleCommentList {
 		if ( $block->shouldHideBlockerName() ) {
 			$blockerLink =  '[[Special:Contact|' . wfMessage( 'fandom-support' )->plain() . ']]';
 		} else {
-			$blockerLink = '[[' . $wgContLang->getNsText( NS_USER ) . ":{$blockerName}|{$blockerName}]]";
+			$blockerLink = '[[' . $contLang->getNsText( NS_USER ) . ":{$blockerName}|{$blockerName}]]";
 		}
 
 		if ( $blockExpiry == 'infinity' ) {
@@ -485,10 +498,10 @@ class ArticleCommentList {
 				}
 			}
 		} else {
-			$blockExpiry = $wgLang->timeanddate( wfTimestamp( TS_MW, $blockExpiry ), true );
+			$blockExpiry = $lang->timeanddate( wfTimestamp( TS_MW, $blockExpiry ), true );
 		}
 
-		if ( $wgUser->mBlock->mAuto ) {
+		if ( $user->mBlock->mAuto ) {
 			$msg = 'autoblockedtext';
 		} else {
 			$msg = 'blockedtext';
@@ -522,7 +535,7 @@ class ArticleCommentList {
 		}
 
 		if ( !empty( $articles ) ) {
-			$db = wfGetDB( DB_SLAVE );
+			$db = wfGetDB( DB_REPLICA );
 			$res = $db->select(
 				'revision',
 				[ 'rev_page', 'min(rev_id) AS min_rev_id' ],
@@ -536,14 +549,14 @@ class ArticleCommentList {
 			/** @var stdClass $row */
 			foreach ( $res as $row ) {
 				if ( isset( $articles[$row->rev_page] ) ) {
-					$articles[$row->rev_page]->setFirstRevId( $row->min_rev_id, DB_SLAVE );
+					$articles[$row->rev_page]->setFirstRevId( $row->min_rev_id, DB_REPLICA );
 					unset( $articles[$row->rev_page] );
 				}
 			}
 
 			/** @var ArticleComment $comment */
 			foreach ( $articles as $id => $comment ) {
-				$comment->setFirstRevId( false, DB_SLAVE );
+				$comment->setFirstRevId( false, DB_REPLICA );
 			}
 		}
 	}
@@ -577,7 +590,9 @@ class ArticleCommentList {
 	 * @return string The cache key
 	 */
 	static private function getCacheKey( Title $title ) {
-		return wfMemcKey( 'articlecomment', 'comm', md5( $title->getDBkey() . $title->getNamespace() . self::CACHE_VERSION ) );
+		$memc = ObjectCache::getLocalClusterInstance();
+
+		return $memc->makeKey( 'articlecomment', 'comm', md5( $title->getDBkey() . $title->getNamespace() . self::CACHE_VERSION ) );
 	}
 
 	/**
@@ -586,9 +601,9 @@ class ArticleCommentList {
 	 * @param Title $title
 	 */
 	static public function purgeCache( Title $title ) {
-		global $wgMemc;
+		$memc = ObjectCache::getLocalClusterInstance();
 
-		$wgMemc->delete( self::getCacheKey( $title ) );
+		$memc->delete( self::getCacheKey( $title ) );
 		$title->invalidateCache();
 		$title->purgeSquid();
 
@@ -612,7 +627,9 @@ class ArticleCommentList {
 		global $wgOut, $wgRC2UDPEnabled, $wgMaxCommentsToDelete, $wgCityId, $wgUser, $wgEnableMultiDeleteExt;
 		$title = $wikiPage->getTitle();
 
-		if ( !MWNamespace::isTalk( $title->getNamespace() ) || !ArticleComment::isTitleComment( $title ) ) {
+		$namespaceInfo = MediaWikiServices::getInstance()->getNamespaceInfo();
+
+		if ( !$namespaceInfo->isTalk( $title->getNamespace() ) || !ArticleComment::isTitleComment( $title ) ) {
 			if ( empty( self::$mArticlesToDelete ) ) {
 				return true;
 			}
@@ -630,7 +647,7 @@ class ArticleCommentList {
 
 		// redirect to article/blog after deleting a comment (or whole article/blog)
 		$parts = ArticleComment::explode( $title->getText() );
-		$parentTitle = Title::newFromText( $parts['title'], MWNamespace::getSubject( $title->getNamespace() ) );
+		$parentTitle = Title::newFromText( $parts['title'], $namespaceInfo->getSubject( $title->getNamespace() ) );
 		$wgOut->redirect( $parentTitle->getFullUrl() );
 
 		// do not use $reason as it contains content of parent article/comment - not current ones that we delete in a loop
@@ -763,7 +780,9 @@ class ArticleCommentList {
 		$oTitle = $oRCCacheEntry->getTitle();
 		$namespace = $oTitle->getNamespace();
 
-		if ( MWNamespace::isTalk( $namespace ) && ArticleComment::isTitleComment( $oTitle ) ) {
+		$namespaceInfo = MediaWikiServices::getInstance()->getNamespaceInfo();
+
+		if ( $namespaceInfo->isTalk( $namespace ) && ArticleComment::isTitleComment( $oTitle ) ) {
 			$parts = ArticleComment::explode( $oTitle->getText() );
 			if ( $parts['title'] != '' ) {
 				$currentName = 'ArticleComments' . $parts['title'];
@@ -795,8 +814,10 @@ class ArticleCommentList {
 			return true;
 		}
 
+		$namespaceInfo = MediaWikiServices::getInstance()->getNamespaceInfo();
+
 		if ( !is_null( $oTitle )
-			&& MWNamespace::isTalk( $namespace )
+			&& $namespaceInfo->isTalk( $namespace )
 			&& ArticleComment::isTitleComment( $oTitle )
 		) {
 			$parts = ArticleComment::explode( $oTitle->getFullText() );
@@ -811,7 +832,7 @@ class ArticleCommentList {
 
 					$text = $title->getText();
 
-					$title = Title::newFromText( $text, MWNamespace::getSubject( $namespace ) );
+					$title = Title::newFromText( $text, $namespaceInfo->getSubject( $namespace ) );
 
 					if ( $title instanceof Title ) {
 						if ( ArticleComment::isBlog() ) {
@@ -844,6 +865,8 @@ class ArticleCommentList {
 	 * @return bool
 	 */
 	static public function ArticleFromTitle( Title &$title, &$article ) {
+		global $wgRequest;
+
 		// Don't bother checking for redirects if we're not loading this article for the current request
 		if ( !self::isTitleForCurrentRequest( $title ) ) {
 			return true;
@@ -852,9 +875,12 @@ class ArticleCommentList {
 		// Only handle comments
 		global $wgArticleCommentsNamespaces;
 		$ns = $title->getNamespace();
+
+		$namespaceInfo = MediaWikiServices::getInstance()->getNamespaceInfo();
+
 		if (
-			!MWNamespace::isTalk( $ns ) ||
-			!in_array( MWNamespace::getSubject( $ns ), $wgArticleCommentsNamespaces ) ||
+			!$namespaceInfo->isTalk( $ns ) ||
+			!in_array( $namespaceInfo->getSubject( $ns ), $wgArticleCommentsNamespaces ) ||
 			!ArticleComment::isTitleComment( $title ) ) {
 			return true;
 		}
@@ -865,14 +891,14 @@ class ArticleCommentList {
 		}
 
 		$parts = ArticleComment::explode( $title->getText() );
-		$redirectTitle = Title::newFromText( $parts['title'], MWNamespace::getSubject( $title->getNamespace() ) );
+		$redirectTitle = Title::newFromText( $parts['title'], $namespaceInfo->getSubject( $title->getNamespace() ) );
 		if ( empty( $redirectTitle ) ) {
 			return true;
 		}
 
 		$query = [];
 		$commentId = $title->getArticleID();
-		$permalink = F::app()->wg->Request->getInt( 'permalink', 0 );
+		$permalink = $wgRequest->getInt( 'permalink', 0 );
 
 		// Use comment ID if available - https://wikia.fogbugz.com/f/cases/11179
 		if ( $commentId !== 0 ) {
@@ -887,7 +913,8 @@ class ArticleCommentList {
 			}
 		}
 
-		F::app()->wg->Out->redirect( $redirectTitle->getFullUrl( $query ) );
+		$out = RequestContext::getMain()->getOutput();
+		$out->redirect( $redirectTitle->getFullUrl( $query ) );
 
 		return true;
 	}
@@ -902,11 +929,13 @@ class ArticleCommentList {
 	 * @return bool
 	 */
 	static private function isTitleForCurrentRequest( Title $title ) {
-		if ( empty( F::app()->wg->Title ) ) {
+		$requestTitle = RequestContext::getMain()->getTitle();
+
+		if ( empty( $requestTitle ) ) {
 			return false;
 		}
 
-		if ( $title->getPrefixedDBkey() != F::app()->wg->Title->getPrefixedDBkey() ) {
+		if ( $title->getPrefixedDBkey() != $requestTitle->getPrefixedDBkey() ) {
 			return false;
 		}
 
@@ -914,7 +943,7 @@ class ArticleCommentList {
 	}
 
 	static private function canSetRedirect() {
-		$req = F::app()->wg->Request;
+		$req = RequestContext::getMain()->getRequest();
 		$redirect = $req->getText( 'redirect', false );
 		$diff = $req->getText( 'diff', '' );
 		$oldId = $req->getText( 'oldid', '' );
@@ -970,8 +999,10 @@ class ArticleCommentList {
 	static public function onConfirmEdit(
 		$SimpleCaptcha, $editPage, $newtext, $section, $merged, &$result
 	): bool {
+		$namespaceInfo = MediaWikiServices::getInstance()->getNamespaceInfo();
+
 		$title = $editPage->getArticle()->getTitle();
-		if ( MWNamespace::isTalk( $title->getNamespace() ) && ArticleComment::isTitleComment( $title ) ) {
+		if ( $namespaceInfo->isTalk( $title->getNamespace() ) && ArticleComment::isTitleComment( $title ) ) {
 			$result = true;	// omit captcha
 			return false;
 		}
@@ -996,10 +1027,12 @@ class ArticleCommentList {
 		$rcNamespace = $rc->getAttribute( 'rc_namespace' );
 		$title = Title::newFromText( $rcTitle, $rcNamespace );
 
-		if ( MWNamespace::isTalk( $rcNamespace ) && ArticleComment::isTitleComment( $title ) ) {
+		$namespaceInfo = MediaWikiServices::getInstance()->getNamespaceInfo();
+
+		if ( $namespaceInfo->isTalk( $rcNamespace ) && ArticleComment::isTitleComment( $title ) ) {
 			$parts = ArticleComment::explode( $rcTitle );
 
-			$titleMainArticle = Title::newFromText( $parts['title'], MWNamespace::getSubject( $rcNamespace ) );
+			$titleMainArticle = Title::newFromText( $parts['title'], $namespaceInfo->getSubject( $rcNamespace ) );
 
 			// fb#15143
 			if ( $titleMainArticle instanceof Title ) {
